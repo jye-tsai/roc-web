@@ -13,6 +13,7 @@
   html,body{margin:0;height:100%;background:#000;color:#c0c0c0;}
   body{position:fixed;inset:0;height:var(--vh,100dvh);display:flex;flex-direction:column;font-family:"MingLiU","細明體","Noto Sans Mono CJK TC","Sarasa Mono TC",Consolas,monospace;font-size:16px;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;-webkit-text-size-adjust:100%;}
+  #loadbar{position:fixed;top:4px;right:8px;z-index:5;font-size:12px;color:#888;background:#111c;padding:2px 6px;border-radius:4px;pointer-events:none}
   #term{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 10px;white-space:pre-wrap;word-break:break-all;line-height:1.25;font-size:var(--fs,16px);}
   #bar{display:flex;border-top:1px solid #333;background:#111;}
   #cmd{flex:1;min-width:0;background:#000;color:#fff;border:0;outline:0;padding:8px 10px;font:inherit;font-size:16px;}
@@ -143,6 +144,7 @@
 <body>
 <div id="stat"></div>
 <div id="term"></div>
+<div id="loadbar">載入世界 0%</div>
 <div id="sheet">
   <div class="tabs"><button data-tab="inv">物品</button><button data-tab="eq">裝備</button><button data-tab="room">地上</button><button data-tab="sk">技能</button><button data-tab="cmd">指令</button><button class="x" data-close>✕</button></div>
   <div class="body"></div>
@@ -315,23 +317,27 @@
 /* ===== 載入器 ===== */
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261020g';
-function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
+const V='20261020h';
+/* async=false：同時下載、依插入順序執行 */
+function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){
   Term.write('\x1b[1;30m載入核心資料...\x1b[m\n');
   try{
-    await loadScript('data/core.js'); await loadScript('data/const.js'); await loadScript('data/skills.js'); await loadScript('data/index.js');
-    for(const f of ['util','db','handler','act','save','info','move','obj','comm','fight','magic','spells_attack','spells_aid','spells_assist','spells_cure_obj','skill','skills_cmd','wiz','update','sim','interp','owner','nanny','mprog'])
-      await loadScript('engine/'+f+'.js?v='+V);
-    await loadScript('ui/panel.js?v='+V);UIPanel.init();
-    const n=ROC.AREAS.length;let k=0;
-    const bar=document.createElement('div');bar.style.color='#555';document.getElementById('term').appendChild(bar);
-    const B=8;
-    for(let i=0;i<n;i+=B){
-      await Promise.all(ROC.AREAS.slice(i,i+B).map(a=>loadScript('data/areas/'+a.id+'.js').then(()=>{k++;})));
-      const w=Math.round(k/n*30);bar.textContent='載入區域 ['+'█'.repeat(w)+'░'.repeat(30-w)+'] '+k+'/'+n;
-    }
+    const core=['data/core.js','data/const.js','data/skills.js','data/index.js'];
+    const eng=['util','db','handler','act','save','info','move','obj','comm','fight','magic','spells_attack','spells_aid','spells_assist','spells_cure_obj','skill','skills_cmd','wiz','update','sim','interp','owner','nanny','mprog']
+      .map(f=>'engine/'+f+'.js?v='+V).concat(['ui/panel.js?v='+V]);
+    await Promise.all(core.concat(eng).map(loadScript));
+    UIPanel.init();
     await ROC.Store.init();
+    /* 區域資料在背景同時下載，登入畫面先出來；輸入名字時若還沒載完才會等 */
+    const n=ROC.AREAS.length;let k=0;
+    const bar=document.getElementById('loadbar');
+    const order={};ROC.AREAS.forEach((a,i)=>order[a.lo]=i);
+    ROC.areasReady=Promise.all(ROC.AREAS.map(a=>{
+      const s=document.createElement('script');s.src='data/areas/'+a.id+'.js';
+      return new Promise((ok,ng)=>{s.onload=()=>{k++;bar.textContent='載入世界 '+Math.round(k/n*100)+'%';ok();};s.onerror=()=>ng('data/areas/'+a.id+'.js');document.head.appendChild(s);});
+    })).then(()=>{ROC.areaData.sort((x,y)=>(order[x.area.vnum_start]??1e9)-(order[y.area.vnum_start]??1e9));bar.remove();});
+    ROC.areasReady.catch(e=>{bar.textContent='載入失敗：'+e;bar.style.color='#f55';});
     Term.write(ROC.Store.mode==='folder'
       ?'\x1b[1;30m角色存檔：ROC網頁\\player\\ 資料夾\x1b[m\n'
       :'\x1b[1;33m角色存檔：瀏覽器 localStorage（換手機／清除瀏覽資料前請先「匯出」備份；電腦用「開始遊戲.cmd」開才會存進 player 資料夾）\x1b[m\n');

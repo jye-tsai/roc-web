@@ -308,11 +308,13 @@ function renderChoices(){
   switch(st){
     case 'GET_NAME':{
       const names=Object.values(R.Store.all()).map(x=>x&&x.name).filter(Boolean).sort();
-      if(names.length)h='<span class="hint">選擇角色，或在下方輸入新名字：</span>'+names.map(n=>'<button data-raw="'+esc(n)+'" class="pri">'+esc(n)+'</button>').join('');
+      if(names.length)h='<span class="hint">選擇角色，或在下方輸入新名字：</span>'+names.map(n=>'<button data-raw="'+esc(n)+'" class="pri">'+(R.remember.get(n)?'⚡':'')+esc(n)+'</button>').join('')
+        +(R.remember.any()?'<button data-act="forget"><small>忘掉記住的密碼</small></button>':'');
       else h='<span class="hint">在下方輸入英文名字（3~12 個字母）建立新角色</span>';
       break;}
     case 'GET_OLD_PASSWORD':case 'OWNER_PASSWORD':case 'GET_NEW_PASSWORD':case 'CONFIRM_NEW_PASSWORD':
-      h='<span class="hint">在下方輸入密碼（至少 5 個字）</span>';break;
+      h='<span class="hint">在下方輸入密碼（至少 5 個字）</span>'
+        +(st==='OWNER_PASSWORD'||st==='GET_NEW_PASSWORD'?'':'<button data-act="rem">'+(d.remember===false?'☐':'☑')+' 記住密碼</button>');break;
     case 'CONFIRM_NEW_NAME':case 'CONFIRM_NEW_RACE':case 'CONFIRM_CLASS':h=yn;break;
     case 'DISPLAY_RACE':case 'DISPLAY_CLASS':case 'READ_MOTD':h='<button data-raw="" class="pri wide1">繼續 ▶</button>';break;
     case 'GET_NEW_RACE':
@@ -666,7 +668,12 @@ function init(){
   });
   const chs=$('choices');
   chs.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
-  chs.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.dataset.raw!==undefined)window.UI.raw(b.dataset.raw);});
+  chs.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.act){const d=Conn.desc;
+      if(b.dataset.act==='rem'&&d)d.remember=d.remember===false;
+      if(b.dataset.act==='forget')R.remember.clear();
+      lastCh='';renderChoices();return;}
+    if(b.dataset.raw!==undefined)window.UI.raw(b.dataset.raw);});
   Term.linkify=linkify;
   const pe=$('pins');
   pe.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});

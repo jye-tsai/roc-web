@@ -13,26 +13,23 @@ R.Desc=function(conn){
   this.conn=conn;this.state='GET_NAME';this.ch=null;this.tries=0;
 };
 R.Desc.prototype.out=function(s){this.conn.send(R.nl(s));};
-const MOBILE_GREET=[
-'\x1b[1;36m  ____     ___     ____ ',
-' |  _ \\   / _ \\   / ___|',
-' | |_) | | | | | | |    ',
-' |  _ <  | |_| | | |___ ',
-' |_| \\_\\  \\___/   \\____|\x1b[0m',
-'',
-'\x1b[1;33m   混   沌   幻   世\x1b[0m',
-'\x1b[36m  The Realm of Chaos\x1b[0m',
-'',
-'\x1b[1;30m Based on Envy 2.2, fixed and',
-' powered by Amenda & Zcecil.',
-' (2005.3) enhanced by Faraway,',
-'   Coconet, WhisperWind',
-' (2006.9) improved by Keelar\x1b[0m'].join('\n');
+/* 手機直向專用的精簡標題（寬度 30 格內），每次隨機一張 */
+const CREDIT=[
+'\x1b[1;30m Based on Envy 2.2',
+' by Amenda & Zcecil',
+' enhanced by Faraway, Coconet,',
+'   WhisperWind / Keelar\x1b[0m'];
+const MOBILE_GREETS=[
+["\u001b[1;36m  ____     ___     ____ ", " |  _ \\   / _ \\   / ___|", " | |_) | | | | | | |    ", " |  _ <  | |_| | | |___ ", " |_| \\_\\  \\___/   \\____|\u001b[0m", "", "\u001b[1;33m   混   沌   幻   世\u001b[0m", "\u001b[0;36m  The Realm of Chaos\u001b[0m", ""],
+["\u001b[1;33m +--------------------------+", " |\u001b[1;31m    *   混 沌 幻 世   *   \u001b[1;33m|", " |\u001b[0;37m     Realm  of  Chaos     \u001b[1;33m|", " +--------------------------+\u001b[0m", "\u001b[0;32m       /\\         /\\", "  /\\  /  \\  /\\   /  \\   /\\", " /  \\/    \\/  \\_/    \\_/  \\\u001b[0m", "\u001b[1;37m   ~ roc.csie.org:5555 ~\u001b[0m", ""],
+["\u001b[1;37m        /\\", "        ||", "        ||    \u001b[1;33m混 沌 幻 世\u001b[1;37m", "        ||", "        ||    \u001b[0;36mRealm of Chaos\u001b[1;37m", "\u001b[1;33m  o=====[]=====o", "        ##", "        ##    \u001b[1;30msince 2001\u001b[1;33m", "        ()\u001b[0m", ""],
+["\u001b[1;31m  |>>>                |>>>", "\u001b[0;37m  |                   |", " _|_  _   _   _   _  _|_", "|   ||_| |_| |_| |_||   |", "|      \u001b[1;33m混 沌 幻 世\u001b[0;37m      |", "|   \u001b[0;36mRealm   of   Chaos\u001b[0;37m  |", "|         ______        |", "|        |      |       |", "|________|______|_______|\u001b[0m", ""]
+].map(a=>a.concat(CREDIT).join('\n'));
 R.Desc.prototype.greet=function(){
   this.conn.send('\x1b[2J');
   /* 窄螢幕（手機直向）改用精簡版標題，原圖太寬縮小後難以辨識 */
   const narrow=typeof window!=='undefined'&&window.innerWidth<600;
-  const art=narrow?MOBILE_GREET:R.pick(CORE.greetings).replace(/\n+$/,'');
+  const art=narrow?R.pick(MOBILE_GREETS):R.pick(CORE.greetings).replace(/\n+$/,'');
   this.out('\x1b[8z'+art+'\x1b[9z\n\n');   /* 包成 ASCII 圖區塊，必要時自動縮放 */
   this.out('\x1b[1;32m[ jye 20261019 Revised Web Edition ]\x1b[0m\n\n');
   this.out('想要進入 混沌幻世 世界冒險的英雄名字是？');
@@ -45,6 +42,15 @@ function validName(n){
   return true;
 }
 
+/* 「記住密碼」：這台裝置存密碼雜湊，下次點角色直接進遊戲 */
+const REM='roc.rem.';
+R.remember={
+  get(n){try{return localStorage.getItem(REM+R.lc(n));}catch(e){return null;}},
+  set(n,h){try{localStorage.setItem(REM+R.lc(n),h);}catch(e){}},
+  del(n){try{localStorage.removeItem(REM+R.lc(n));}catch(e){}},
+  clear(){try{for(const k of Object.keys(localStorage))if(k.startsWith(REM))localStorage.removeItem(k);}catch(e){}},
+  any(){try{return Object.keys(localStorage).some(k=>k.startsWith(REM));}catch(e){return false;}}
+};
 R.Desc.prototype.input=async function(line){
   const d=this,a=(line||'').trim();
   let ch=d.ch;
@@ -60,6 +66,7 @@ R.Desc.prototype.input=async function(line){
     if(R.isOwnerName(name)){d.ownerName=name;d.out('密碼：');d.conn.echo(false);d.state='OWNER_PASSWORD';return;}
     if(R.Save.exists(name)){
       d.ch=R.Save.load(name);d.ch.conn=d.conn;
+      if(d.ch.pc.pwd&&R.remember.get(name)===d.ch.pc.pwd){d.out('\x1b[1;30m（已記住密碼，直接登入）\x1b[0m\n');enterGame(d);return;}
       d.out('密碼：');d.conn.echo(false);d.state='GET_OLD_PASSWORD';return;
     }
     d.ch=R.newPlayer(name);d.ch.conn=d.conn;
@@ -67,7 +74,8 @@ R.Desc.prototype.input=async function(line){
   }
   case 'GET_OLD_PASSWORD':{
     d.out('\n');d.conn.echo(true);
-    if(await R.hash(ch.name+a)!==ch.pc.pwd){d.out('密碼錯誤。\n請重新輸入您的名字：');d.ch=null;d.state='GET_NAME';return;}
+    if(await R.hash(ch.name+a)!==ch.pc.pwd){R.remember.del(ch.name);d.out('密碼錯誤。\n請重新輸入您的名字：');d.ch=null;d.state='GET_NAME';return;}
+    if(d.remember!==false)R.remember.set(ch.name,ch.pc.pwd);
     d.out(helpText('motd'));d.state='READ_MOTD';return;
   }
   case 'OWNER_PASSWORD':{
@@ -95,6 +103,7 @@ R.Desc.prototype.input=async function(line){
   case 'CONFIRM_NEW_PASSWORD':
     d.out('\n');
     if(await R.hash(ch.name+a)!==ch.pc.pwd){d.out('前後兩次密碼不符\n請重新輸入密碼： ');d.state='GET_NEW_PASSWORD';return;}
+    if(d.remember!==false)R.remember.set(ch.name,ch.pc.pwd);
     d.conn.echo(true);d.out('\n請按 Return 鍵繼續：\n');d.state='DISPLAY_RACE';return;
   case 'DISPLAY_RACE':{
     let s='請選擇一個種族：\n\n';
@@ -180,11 +189,13 @@ R.logout=function(ch){
 };
 
 R.boot=function(conn){
-  R.bootDb();
-  R.startUpdate();
+  /* 世界資料可能還在背景下載：先出登入畫面，第一次需要世界時才等它 */
+  R.worldReady=Promise.resolve(R.areasReady).then(()=>{R.bootDb();R.startUpdate();});
+  let ready=false;R.worldReady.then(()=>{ready=true;});
   const d=new R.Desc(conn);conn.desc=d;
   conn.onInput(async line=>{
     try{
+      if(!ready){d.out('\x1b[1;30m（世界載入中，請稍候…）\x1b[0m\n');await R.worldReady;}
       await d.input(line);
       if(d.ch){d.ch.desc=d;if(d.state==='PLAYING')R.flush(d.ch,true);}
     }catch(e){console.error(e);conn.send('\x1b[1;31m[錯誤] '+e.message+'\x1b[m\n');}
