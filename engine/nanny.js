@@ -13,9 +13,27 @@ R.Desc=function(conn){
   this.conn=conn;this.state='GET_NAME';this.ch=null;this.tries=0;
 };
 R.Desc.prototype.out=function(s){this.conn.send(R.nl(s));};
+const MOBILE_GREET=[
+'\x1b[1;36m  ____     ___     ____ ',
+' |  _ \\   / _ \\   / ___|',
+' | |_) | | | | | | |    ',
+' |  _ <  | |_| | | |___ ',
+' |_| \\_\\  \\___/   \\____|\x1b[0m',
+'',
+'\x1b[1;33m   混   沌   幻   世\x1b[0m',
+'\x1b[36m  The Realm of Chaos\x1b[0m',
+'',
+'\x1b[1;30m Based on Envy 2.2, fixed and',
+' powered by Amenda & Zcecil.',
+' (2005.3) enhanced by Faraway,',
+'   Coconet, WhisperWind',
+' (2006.9) improved by Keelar\x1b[0m'].join('\n');
 R.Desc.prototype.greet=function(){
   this.conn.send('\x1b[2J');
-  this.out(R.pick(CORE.greetings)+'\n\n');
+  /* 窄螢幕（手機直向）改用精簡版標題，原圖太寬縮小後難以辨識 */
+  const narrow=typeof window!=='undefined'&&window.innerWidth<600;
+  const art=narrow?MOBILE_GREET:R.pick(CORE.greetings).replace(/\n+$/,'');
+  this.out('\x1b[8z'+art+'\x1b[9z\n\n');   /* 包成 ASCII 圖區塊，必要時自動縮放 */
   this.out('想要進入 混沌幻世 世界冒險的英雄名字是？');
 };
 
