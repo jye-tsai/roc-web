@@ -22,8 +22,6 @@ R.interpret=function(ch,line){
   if(!line)return;
   if(ch.wait>0&&!ch.npc){ch.inq=ch.inq||[];if(ch.inq.length<20)ch.inq.push(line);return;}
   let word,arg;
-  /* 房間／物品劇本的自訂指令（room_command、room_mask、obj_command）優先 */
-  if(!ch.npc&&R.MP){const [w0,a0]=R.one_arg(line);if(R.MP.command(ch,w0,a0))return;}
   if(!/^[a-z0-9]/i.test(line[0])&&ALIAS[line[0]]){word=ALIAS[line[0]];arg=line.slice(1).trim();}
   else{[word,arg]=R.one_arg(line);word=word.toLowerCase();arg=(arg||'').trim();if(ALIAS[word])word=ALIAS[word];}
   /* 原版指令表 */
@@ -37,9 +35,13 @@ R.interpret=function(ch,line){
     const nm=entry[1].replace(/^do_/,'');
     fn=cmd[nm]||cmd[entry[0]];
     if(ch.position<entry[2]){R.send(ch,(POSMSG[ch.position]||'你辦不到.')+'\n');return;}
+    /* room_mask：房間劇本可以攔下現有的指令（比對展開後的指令全名） */
+    if(R.MP&&R.MP.mask(ch,entry[0],arg))return;
     if(!fn){R.send(ch,R.C.YEL+'「'+entry[0]+'」這個指令在網頁版還沒開放。'+R.C.NOR+'\n');return;}
     fn(ch,arg,entry[0]);return;
   }
+  /* 不是現有指令：物品的 obj_command、房間的 room_command */
+  if(R.MP&&R.MP.command(ch,word,arg))return;
   /* JS 額外指令（原表沒有的） */
   const extra=Object.keys(cmd).find(k=>R.str_prefix(word,k));
   if(extra){cmd[extra](ch,arg,extra);return;}

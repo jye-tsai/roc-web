@@ -86,7 +86,10 @@ R.doSocial=function(ch,name,a){
   if(!v){R.send(ch,'這裡沒有這個人。\n');return true;}
   if(v===ch){if(s[7])R.act(s[7],ch,null,v,R.TO_ROOM);if(s[6])R.act(s[6],ch,null,v,R.TO_CHAR);return true;}
   if(s[4])R.act(s[4],ch,null,v,R.TO_NOTVICT);if(s[3])R.act(s[3],ch,null,v,R.TO_CHAR);if(s[5])R.act(s[5],ch,null,v,R.TO_VICT);
-  if(R.MP&&R.MP.has(v,'act_prog')){R.MP.social(ch,v,name);return true;}
+  if(!ch.npc&&v.npc&&!v.aff.has('CHARM')&&R.isAwake(v)){
+    if(!R.canSee(v,ch)){R.send(ch,'他看不到你！\n');return true;}
+    if(R.MP&&R.MP.social(ch,v,name))return true;
+  }
   /* NPC 回應（對應原版 social 的 npc 反應） */
   if(v.npc&&R.isAwake(v)&&!v.fighting&&R.pct()<50){
     const r=R.CONST.socials.filter(x=>x[3]&&/smile|nod|bow|wave|grin|hug|poke|slap|laugh/.test(x[0]));

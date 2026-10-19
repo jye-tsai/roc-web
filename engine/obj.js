@@ -13,6 +13,7 @@ function getObj(ch,o,cont){
     R.send(ch,'你拿出了 '+amt+' 枚金幣.\n');return;
   }
   R.objToChar(o,ch);
+  R.MP&&R.MP.objAct(ch,o,'get');
 }
 R.getObj=getObj;
 cmd.get=function(ch,a){
@@ -65,7 +66,7 @@ cmd.drop=function(ch,a){
   }
   if(a1!=='all'&&!a1.startsWith('all.')){
     const o=R.getObjCarry(ch,a1);if(!o){R.send(ch,'你沒有那樣東西.\n');return;}
-    R.objToRoom(o,ch.room);R.act('你丟下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 丟下 $p.',ch,o,null,R.TO_ROOM);return;
+    R.objToRoom(o,ch.room);R.act('你丟下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 丟下 $p.',ch,o,null,R.TO_ROOM);R.MP&&R.MP.objAct(ch,o,'drop');return;
   }
   const nm=a1.slice(4);let f=false;
   for(const o of ch.carrying.filter(o=>o.wear_loc<0))if(!nm||R.is_name(nm,o.name)){f=true;R.objToRoom(o,ch.room);R.act('你丟下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 丟下 $p.',ch,o,null,R.TO_ROOM);}
@@ -197,7 +198,7 @@ cmd.eat=function(ch,a){
   const [a1]=R.one_arg(a);if(!a1){R.send(ch,'要吃什麼？\n');return;}
   const o=R.getObjCarry(ch,a1);if(!o){R.send(ch,'你沒有那樣東西.\n');return;}
   if(!/FOOD|PILL/.test(o.type)&&!R.isImm(ch)){R.send(ch,'那不能吃.\n');return;}
-  R.act('你吃下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 吃下 $p.',ch,o,null,R.TO_ROOM);
+  R.act('你吃下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 吃下 $p.',ch,o,null,R.TO_ROOM);R.MP&&R.MP.objAct(ch,o,'eat');
   if(ch.pc)ch.pc.cond[1]=Math.min(100,ch.pc.cond[1]+(o.values[0]||5)*2);
   if(o.type==='PILL')for(const i of [1,2,3])objCast(objSpell(o,i),o.values[0],ch,ch,null);
   R.extractObj(o);
@@ -208,7 +209,7 @@ cmd.drink=function(ch,a){
   if(!o){R.send(ch,a1?'你找不到它.\n':'要喝什麼？\n');return;}
   if(o.type!=='FOUNTAIN'&&o.type!=='DRINK_CON'){R.send(ch,'你不能從那裡喝水.\n');return;}
   if(o.type==='DRINK_CON'){if(o.values[1]<=0){R.send(ch,'它已經空了.\n');return;}o.values[1]--;}
-  R.act('你從 $p 喝了一些東西.',ch,o,null,R.TO_CHAR);R.act('$n 從 $p 喝了一些東西.',ch,o,null,R.TO_ROOM);
+  R.act('你從 $p 喝了一些東西.',ch,o,null,R.TO_CHAR);R.act('$n 從 $p 喝了一些東西.',ch,o,null,R.TO_ROOM);R.MP&&R.MP.objAct(ch,o,'drink');
   if(ch.pc)ch.pc.cond[2]=Math.min(100,ch.pc.cond[2]+10);
 };
 
