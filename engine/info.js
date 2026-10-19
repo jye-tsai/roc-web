@@ -185,7 +185,7 @@ cmd.who=function(ch){
 };
 
 cmd.help=function(ch,a){
-  a=a||'summary';
+  a=(a||'').replace(/^['"]+|['"]+$/g,'')||'summary';
   const ok=R.CORE.helps.filter(h=>h.level<=ch.level),A=a.toUpperCase();
   let hits=ok.filter(h=>h.keywords.toUpperCase().split(/\s+/).includes(A)||h.keywords.toUpperCase()===A);
   if(!hits.length)hits=ok.filter(h=>R.is_name(a,h.keywords)).slice(0,1);

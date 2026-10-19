@@ -207,7 +207,7 @@ function linkify(t){
   /* exits 列表：North  - 某某地方 */
   t=t.replace(/^(North|South|East|West|Up|Down)(?=\s+-)/gm,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 文字裡的指令提示：look sign / help newbie */
-  t=t.replace(/\b((?:look|help) [A-Za-z][A-Za-z']*)/gi,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
+  t=t.replace(/\b((?:look|help) [A-Za-z](?:[A-Za-z']*[A-Za-z])?)/gi,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 中文名(english keyword) */
   t=t.replace(/([^\s()<>\[\]，。、：:；;「」]{0,8})\(([A-Za-z][A-Za-z0-9'\- ]{0,40})\)/g,
     (m,pre,kw)=>{for(const w of R.lc(kw.trim()).split(/\s+/))seenKw.add(w);seenKw.add(R.lc(kw.trim()));return '<u class="lk '+kwKind(kw)+'" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>';});
@@ -245,6 +245,9 @@ function ctxMenu(kw,label){
         if(v.shop)h+=btn('商品','list','pri');
         if(v.npc)h+=talkButtons(ch,v,r);
         if(v.psk)h+=btn('學技能','practice','pri');
+        if(v.npc&&v.act&&v.act.has('TRAIN'))h+='</div><div class="pt">訓練 <small>練習點 '+ch.practice+'・金 '+ch.gold+'</small></div><div class="pa">'+btn('可練項目','train','pri')
+          +[['str','力量'],['int','智能'],['wis','智慧'],['dex','敏捷'],['con','體質'],['hp','生命'],['mana','魔法'],['move','移動'],['practice','練習點']].map(([a,n])=>btn(n,'train '+a)).join('')
+          +[['hp-r','生命'],['mana-r','魔法'],['move-r','移動'],['practice-r','練習點']].map(([a,n])=>btn('盡量'+n,'train '+a)).join('');
         if(!v.npc)h+=btn('跟隨','follow '+r);
         const {sp,act}=learnedList(ch);
         for(const sn of [...sp,...act]){
