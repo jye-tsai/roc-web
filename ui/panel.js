@@ -48,6 +48,118 @@ function renderStat(){
   if(h!==lastStat){el.innerHTML=h;el.classList.add('on');lastStat=h;}
 }
 
+/* ---- 技能／法術 ---- */
+/* 主動技能 → 指令名稱、目標方式（none 直接用；fight 戰鬥中打對手、否則選人；char 選人；fill 填進輸入列自己補） */
+const SKILL_CMD={kick:['kick','fight'],bashhead:['bashhead','fight'],disarm:['disarm','none'],berserk:['berserk','none'],
+  frenzy:['frenzy','none'],hide:['hide','none'],sneak:['sneak','none'],backstab:['backstab','char'],rescue:['rescue','char'],
+  peek:['peek','char'],hunt:['hunt','char'],track:['track','fill'],'bash door':['bash','fill'],'pick lock':['pick','fill'],steal:['steal','fill']};
+const SK=()=>R.SK||[];
+const pctOf=(ch,sn)=>R.getSkillPercent(ch,sn);
+const spellArg=sn=>{const n=SK()[sn].name;return n.includes(' ')?"'"+n+"'":n;};
+const castCmd=(sn,t)=>'cast '+spellArg(sn)+(t?' '+t:'');
+function learnedList(ch){
+  const sp=[],act=[],pas=[];
+  SK().forEach((s,sn)=>{
+    if(sn<1||!pctOf(ch,sn))return;
+    if(s.fun)sp.push(sn);else if(SKILL_CMD[s.name]&&R.cmds[SKILL_CMD[s.name][0]])act.push(sn);else pas.push(sn);
+  });
+  const lv=sn=>R.skillReqLevel(ch,sn);
+  for(const a of [sp,act,pas])a.sort((x,y)=>lv(x)-lv(y));
+  return {sp,act,pas};
+}
+function targetsFor(ch,sn,isSpell){
+  /* 回傳 [{label,cmd}] ；只有一個合理選擇時用來直接執行 */
+  const s=SK()[sn],out=[],f=ch.fighting&&ch.fighting.room===ch.room?ch.fighting:null;
+  const people=(self)=>ch.room.people.filter(v=>(self||v!==ch)&&R.canSee(ch,v));
+  const mk=(v,c)=>{const r=v===ch?'self':refChar(ch,v);return r?{label:v===ch?'自己':R.strip(R.PERS(v,ch)),cmd:c(r)}:null;};
+  if(isSpell){
+    switch(s.tar){
+      case 0:case 3:return [{label:'施放',cmd:castCmd(sn)}];
+      case 1:{if(f)out.push({label:'⚔ '+R.strip(R.PERS(f,ch)),cmd:castCmd(sn)});
+        for(const v of people(false))if(v!==f){const t=mk(v,r=>castCmd(sn,r));if(t)out.push(t);}return out;}
+      case 2:{out.push({label:'自己',cmd:castCmd(sn)});
+        for(const v of people(false)){const t=mk(v,r=>castCmd(sn,r));if(t)out.push(t);}return out;}
+      case 4:case 5:{const list=s.tar===4?ch.carrying.filter(o=>o.wear_loc<0):[...ch.carrying,...ch.room.contents];
+        for(const o of list){const r=s.tar===4?refCarry(ch,o):refHere(ch,o);if(r&&!out.some(x=>x.cmd===castCmd(sn,r)))out.push({label:nm(o),cmd:castCmd(sn,r)});}return out;}
+      default:return [{label:'輸入目標…',fill:castCmd(sn)+' '}];
+    }
+  }
+  const [c,mode]=SKILL_CMD[s.name];
+  if(mode==='none')return [{label:'使用',cmd:c}];
+  if(mode==='fill')return [{label:'輸入目標…',fill:c+' '}];
+  if(mode==='fight'&&f)out.push({label:'⚔ '+R.strip(R.PERS(f,ch)),cmd:c});
+  for(const v of people(false))if(!(mode==='fight'&&v===f)){const t=mk(v,r=>c+' '+r);if(t)out.push(t);}
+  return out;
+}
+function targetButtons(ts){
+  if(!ts.length)return '<div class="hint">這裡沒有可以用的目標。</div>';
+  return ts.map(t=>t.fill!==undefined?btnFill(esc(t.label),t.fill):btn(esc(t.label),t.cmd,'pri')).join('');
+}
+function renderSkills(ch){
+  const {sp,act,pas}=learnedList(ch);
+  const pins=getPins(ch);
+  let h='<div class="top"><span class="hint">點技能選目標；☆ 釘到快捷列</span></div>';
+  const skRow=(sn,isSpell)=>{
+    const s=SK()[sn],k='sk:'+sn,open=openKey===k,low=isSpell&&ch.mana<s.mana;
+    const pinned=pins.some(p=>p.k==='s'&&p.n===s.name);
+    return '<div class="it'+(open?' open':'')+'"><div class="ih" data-k="'+k+'">'
+      +'<span class="nm'+(low?' hi':'')+'">'+esc(s.cname)+' <small>'+esc(s.name)+'</small></span>'
+      +'<span class="tg">'+(isSpell?s.mana+'法 · ':'')+pctOf(ch,sn)+'%</span></div>'
+      +(open?'<div class="ia">'+targetButtons(targetsFor(ch,sn,isSpell))
+        +'<button data-pin="s|'+esc(s.name)+'" class="pin">'+(pinned?'★ 取消釘選':'☆ 釘到快捷列')+'</button></div>':'')+'</div>';
+  };
+  if(sp.length){h+='<div class="sec">法術</div>';for(const sn of sp)h+=skRow(sn,true);}
+  if(act.length){h+='<div class="sec">技能</div>';for(const sn of act)h+=skRow(sn,false);}
+  if(!sp.length&&!act.length)h+='<div class="hint pad">你還沒學會可以主動使用的技能或法術。到導師那裡用 practice 學習。</div>';
+  if(pas.length)h+='<div class="sec">被動技能</div><div class="pas">'+pas.map(sn=>'<span>'+esc(SK()[sn].cname)+' '+pctOf(ch,sn)+'%</span>').join('')+'</div>';
+  return h;
+}
+
+/* ---- 快捷列（釘選的技能／法術／藥水，每個角色各自記住） ---- */
+const pinKey=ch=>'roc.pins.'+R.lc(ch.name);
+function getPins(ch){try{return JSON.parse(localStorage.getItem(pinKey(ch))||'[]');}catch(e){return [];}}
+function setPins(ch,a){try{localStorage.setItem(pinKey(ch),JSON.stringify(a));}catch(e){}}
+function togglePin(ch,k,n,label){
+  const a=getPins(ch),i=a.findIndex(p=>p.k===k&&p.n===n);
+  if(i>=0)a.splice(i,1);else{if(a.length>=12)a.shift();a.push({k,n,label});}
+  setPins(ch,a);renderPins(true);
+}
+/* 物品快捷：喝／吃／念（對自己） */
+const ITEM_USE={POTION:['quaff','喝'],PILL:['eat','吃'],FOOD:['eat','吃'],SCROLL:['recite','念']};
+function runPin(ch,p){
+  if(p.k==='s'){
+    const sn=SK().findIndex(s=>s.name===p.n);if(sn<1||!pctOf(ch,sn))return;
+    const isSpell=!!SK()[sn].fun,ts=targetsFor(ch,sn,isSpell);
+    const f=ch.fighting&&ch.fighting.room===ch.room;
+    /* 戰鬥中的攻擊類、或只有一種用法 → 直接用；否則打開技能面板選目標 */
+    const direct=ts.length===1&&ts[0].cmd||(f&&ts[0]&&ts[0].label.startsWith('⚔')&&ts[0].cmd)
+      ||(isSpell&&SK()[sn].tar===2&&ts[0].cmd);
+    if(direct){send(direct);return;}
+    if(ts.length===1&&ts[0].fill!==undefined){window.UI.fill(ts[0].fill);return;}
+    tab='sk';openKey='sk:'+sn;$('sheet').classList.add('on');document.body.classList.add('sheet-on');renderSheet();
+    return;
+  }
+  if(p.k==='i'){
+    const o=ch.carrying.find(x=>x.wear_loc<0&&x.vnum===p.v);
+    if(!o){Term.write('\x1b[1;30m[身上沒有 '+p.label+' 了]\x1b[m\n');return;}
+    const u=ITEM_USE[o.type],r=refCarry(ch,o);if(u&&r)send(u[0]+' '+r);
+  }
+}
+let lastPins='';
+function renderPins(force){
+  const el=$('pins'),ch=me();
+  const a=ch&&ch.room?getPins(ch):[];
+  let h='';
+  for(let i=0;i<a.length;i++){
+    const p=a[i];let label=p.label,sub='',dis=false;
+    if(p.k==='s'){const sn=SK().findIndex(s=>s.name===p.n);const s=SK()[sn];if(s){label=s.cname;if(s.fun){sub=s.mana+'';dis=ch.mana<s.mana;}}}
+    else{const n=ch.carrying.filter(x=>x.wear_loc<0&&x.vnum===p.v).length;sub='×'+n;dis=!n;}
+    h+='<button data-i="'+i+'"'+(dis?' class="dis"':'')+'>'+esc(label)+(sub?'<small>'+esc(sub)+'</small>':'')+'</button>';
+  }
+  if(!force&&h===lastPins)return;
+  lastPins=h;el.innerHTML=h;el.classList.toggle('on',!!h);
+}
+
 /* ---- 面板 ---- */
 let tab='inv',openKey=null,giveFor=null,putFor=null;
 const keyOf=o=>o.vnum+'|'+o.short;
@@ -60,6 +172,9 @@ function invActions(ch,o){
   if(o.type==='LIGHT'||slotOf(o))a+=btn(o.wear.has('WIELD')||o.wear.has('TWO_HAND')?'裝備':o.wear.has('HOLD')?'握住':'穿上','wear '+r,'pri');
   if(/FOOD|PILL/.test(o.type))a+=btn('吃','eat '+r,'pri');
   if(o.type==='DRINK_CON'){const rh=refHere(ch,o);if(rh)a+=btn('喝','drink '+rh,'pri');}
+  if(o.type==='POTION')a+=btn('喝下','quaff '+r,'pri');
+  if(o.type==='SCROLL'){a+=btn('念（自己）','recite '+r,'pri')+'<button data-recite="'+esc(keyOf(o))+'">對…念</button>';}
+  if(ITEM_USE[o.type]){const pinned=getPins(ch).some(p=>p.k==='i'&&p.v===o.vnum);a+='<button data-pini="'+o.vnum+'" class="pin">'+(pinned?'★ 取消釘選':'☆ 釘到快捷列')+'</button>';}
   if(/CONTAINER/.test(o.type))a+='<button data-put="'+esc(keyOf(o))+'">放東西進去…</button>';
   const rh=refHere(ch,o);if(rh)a+=btn('檢視','examine '+rh);
   a+='<button data-give="'+esc(keyOf(o))+'">給…</button>';
@@ -101,6 +216,10 @@ function renderInv(ch){
       const r=refCarry(ch,o);
       if(giveFor===k)return '<div class="hint">要給誰？</div>'+peoplePicker(ch,v=>'give '+r+' '+v)+'<button data-back>取消</button>';
       if(putFor==='into:'+k)return '<div class="hint">放進哪個容器？</div>'+containerPicker(ch,o,r)+'<button data-back>取消</button>';
+      if(putFor==='recite:'+k){
+        const ts=ch.room.people.filter(v=>R.canSee(ch,v)).map(v=>{const rv=v===ch?'self':refChar(ch,v);return rv?btn(esc(v===ch?'自己':R.strip(R.PERS(v,ch))),'recite '+r+' '+rv,'pri'):'';}).join('');
+        return '<div class="hint">要對誰念？</div>'+ts+'<button data-back>取消</button>';
+      }
       if(putFor===k){
         const rc=refHere(ch,o),items=ch.carrying.filter(x=>x.wear_loc<0&&x!==o);
         return '<div class="hint">要放什麼進 '+esc(nm(o))+'？</div>'+items.map(x=>{const rx=refCarry(ch,x);return rx&&rc?btn(esc(nm(x)),'put '+rx+' '+rc):'';}).join('')+'<button data-back>取消</button>';
@@ -128,7 +247,11 @@ function renderEq(ch){
     const k=keyOf(o)+'@'+l,open=openKey===k;
     h+='<div class="it'+(open?' open':'')+'"><div class="ih" data-k="'+esc(k)+'"><span class="sl">'+where+'</span><span class="nm">'+esc(nm(o))+'</span></div>'
       +(open?'<div class="ia">'+(()=>{const r=refWear(ch,o),rh=refHere(ch,o);
-        return (r?btn('脫下','remove '+r,'pri'):'')+(rh?btn('檢視','examine '+rh):'');})()+'</div>':'')+'</div>';
+        let u='';
+        if(l===17&&o.type==='STAFF')u+=btn('揮舞','brandish','pri');
+        if(l===17&&o.type==='WAND'){if(ch.fighting)u+=btn('指向對手','zap','pri');
+          u+=ch.room.people.filter(v=>v!==ch&&R.canSee(ch,v)).map(v=>{const rv=refChar(ch,v);return rv?btn('指向 '+esc(R.strip(R.PERS(v,ch))),'zap '+rv):'';}).join('');}
+        return u+(r?btn('脫下','remove '+r,'pri'):'')+(rh?btn('檢視','examine '+rh):'');})()+'</div>':'')+'</div>';
   }
   return h;
 }
@@ -156,7 +279,7 @@ function renderSheet(){
   const body=sh.querySelector('.body');
   if(!ch||!ch.room){body.innerHTML='<div class="hint pad">進入遊戲後才能使用。</div>';return;}
   const st=body.scrollTop;
-  body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):renderRoom(ch);
+  body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):tab==='sk'?renderSkills(ch):renderRoom(ch);
   body.scrollTop=st;
 }
 function openSheet(t){
@@ -177,16 +300,24 @@ function init(){
     if(b.dataset.give){giveFor=b.dataset.give;renderSheet();return;}
     if(b.dataset.put){putFor=b.dataset.put;renderSheet();return;}
     if(b.dataset.into){putFor='into:'+b.dataset.into;renderSheet();return;}
+    if(b.dataset.recite){putFor='recite:'+b.dataset.recite;renderSheet();return;}
+    if(b.dataset.pin){const ch=me();if(ch){const [k,n]=b.dataset.pin.split('|');togglePin(ch,k,n,n);renderSheet();}return;}
+    if(b.dataset.pini){const ch=me();if(ch){const v=+b.dataset.pini,o=ch.carrying.find(x=>x.vnum===v);
+      const a=getPins(ch),i=a.findIndex(p=>p.k==='i'&&p.v===v);if(i>=0)a.splice(i,1);else{if(a.length>=12)a.shift();a.push({k:'i',v,label:o?nm(o).replace(/\(.*\)$/,''):'物品'});}
+      setPins(ch,a);renderPins(true);renderSheet();}return;}
     if(b.dataset.back!==undefined){giveFor=putFor=null;renderSheet();return;}
     if(b.dataset.fill){window.UI.fill(b.dataset.fill);return;}
     if(b.dataset.c){giveFor=putFor=null;send(b.dataset.c);}
   });
-  for(const b of sh.querySelectorAll('button'))b.addEventListener('pointerdown',e=>e.preventDefault());
+  sh.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
+  const pe=$('pins');
+  pe.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
+  pe.addEventListener('click',e=>{const b=e.target.closest('button');const ch=me();if(!b||!ch)return;const p=getPins(ch)[+b.dataset.i];if(p)runPin(ch,p);});
   /* 有新輸出時更新（同一個畫格只算一次） */
   let q=false;
   const w=Term.write;
-  Term.write=function(s){w.call(Term,s);if(!q){q=true;requestAnimationFrame(()=>{q=false;renderStat();renderSheet();});}};
-  setInterval(renderStat,1000);
+  Term.write=function(s){w.call(Term,s);if(!q){q=true;requestAnimationFrame(()=>{q=false;renderStat();renderPins();renderSheet();});}};
+  setInterval(()=>{renderStat();renderPins();},1000);
 }
 window.UIPanel={open:openSheet,close:closeSheet,init};
 })(ROC);

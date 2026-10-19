@@ -81,6 +81,17 @@
   #sheet .sub{width:100%;border-left:2px solid #333;padding-left:8px;display:flex;flex-direction:column;gap:4px}
   #sheet .subi{display:flex;align-items:center;gap:8px}
   #sheet .subi span{flex:1}
+  #sheet .nm small{color:#666;font-size:12px}
+  #sheet .sec{padding:6px 10px 2px;color:#ff5;font-size:13px;background:#0c0c0c;border-bottom:1px solid #222}
+  #sheet .pas{display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 10px;color:#777;font-size:13px}
+  #sheet button.pin{color:#fc5;border-color:#553}
+  /* 快捷列（釘選） */
+  #pins{display:none;gap:4px;padding:4px;background:#111;border-top:1px solid #333;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #pins.on{display:flex}
+  #pins button{flex:0 0 auto;min-width:3.6em;height:2.4em;background:#1d1d2a;color:#9cf;border:1px solid #335;border-radius:4px;font:inherit;font-size:14px;padding:0 8px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  #pins button small{display:block;font-size:10px;color:#77a;line-height:1}
+  #pins button.dis{opacity:.4}
+  #pins button:active{background:#335}
   .blink{animation:bl 1s step-start infinite}@keyframes bl{50%{opacity:0}}
 </style>
 </head>
@@ -88,9 +99,10 @@
 <div id="stat"></div>
 <div id="term"></div>
 <div id="sheet">
-  <div class="tabs"><button data-tab="inv">物品</button><button data-tab="eq">裝備</button><button data-tab="room">地上</button><button class="x" data-close>✕</button></div>
+  <div class="tabs"><button data-tab="inv">物品</button><button data-tab="eq">裝備</button><button data-tab="room">地上</button><button data-tab="sk">技能</button><button class="x" data-close>✕</button></div>
   <div class="body"></div>
 </div>
+<div id="pins"></div>
 <div id="keys">
   <div class="dir">
     <button data-c="up" class="ud">上</button><button data-c="north">北</button><button data-c="look">看</button>
@@ -99,7 +111,7 @@
   </div>
   <div class="cmds">
     <button data-c="score">狀態</button><button data-ui="inv">物品</button><button data-ui="eq">裝備</button><button data-c="exits">出口</button>
-    <button data-c="kill " data-fill>攻擊…</button><button data-c="flee">逃跑</button><button data-c="cast " data-fill>施法…</button><button data-ui="room">地上</button>
+    <button data-c="kill " data-fill>攻擊…</button><button data-c="flee">逃跑</button><button data-ui="sk">技能</button><button data-ui="room">地上</button>
     <button data-c="rest">休息</button><button data-c="sleep">睡覺</button><button data-c="wake">醒來</button><button data-c="stand">站起</button>
     <button data-c="who">誰在</button><button data-c="say " data-fill>說話…</button><button data-c="help " data-fill>說明…</button><button data-c="save">存檔</button>
   </div>

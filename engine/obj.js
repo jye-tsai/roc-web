@@ -198,6 +198,7 @@ cmd.eat=function(ch,a){
   if(!/FOOD|PILL/.test(o.type)&&!R.isImm(ch)){R.send(ch,'那不能吃.\n');return;}
   R.act('你吃下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 吃下 $p.',ch,o,null,R.TO_ROOM);
   ch.pc.cond[1]=Math.min(100,ch.pc.cond[1]+(o.values[0]||5)*2);
+  if(o.type==='PILL')for(const i of [1,2,3])objCast(objSpell(o,i),o.values[0],ch,ch,null);
   R.extractObj(o);
 };
 cmd.drink=function(ch,a){
@@ -270,5 +271,93 @@ cmd.value=function(ch,a){
   const c=cost(k,o,false);
   if(c<=0){R.act('$n 搖搖頭，看來對 $p 一點興趣也沒有.',k,o,ch,R.TO_VICT);return;}
   R.act("$n 告訴你, '我願意出 "+c+" 枚金幣的價錢買下 $p'.",k,o,ch,R.TO_VICT);
+};
+/* ---- 魔法物品：藥水／藥丸／卷軸／法杖／魔杖（對應 do_quaff / do_recite / do_brandish / do_zap） ---- */
+/* 法術名稱存在原型的 values（createObject 會把字串轉成數字），所以從 proto 讀 */
+function objSpell(o,i){
+  const v=(o.proto&&o.proto.values||[])[i];
+  if(v===undefined||v===null||v==='')return -1;
+  if(/^-?\d+$/.test(String(v))){const n=+v;return n>0&&n<R.SK.length?n:-1;}
+  const i2=R.SK.findIndex(k=>k.name===v);return i2>0?i2:R.skillLookup(v);
+}
+R.objSpell=objSpell;
+function objCast(sn,level,ch,v,obj){
+  if(sn<=0||!R.SK[sn])return;
+  const s=R.SK[sn];let vo=null;
+  switch(s.tar){
+    case 0:case 6:break;
+    case 1:
+      if(!v)v=ch.fighting;
+      if(!v){R.send(ch,'你找不到目標.\n');return;}
+      if(v!==ch&&R.isSafe&&R.isSafe(ch,v))return;
+      vo=v;break;
+    case 2:case 3:vo=v||ch;break;
+    case 4:case 5:
+      if(!obj){R.send(ch,'這個法術需要施在物品上.\n');return;}
+      vo=obj;break;
+  }
+  R.castSpell(sn,Math.max(1,level),ch,vo);
+  if(s.tar===1&&v&&!v.deleted&&v!==ch&&v.master!==ch&&R.isAwake(v)&&v.room===ch.room&&!v.fighting&&v.position!==R.POS.DEAD)R.multiHit(v,ch);
+}
+R.objCast=objCast;
+cmd.quaff=function(ch,a){
+  const [a1]=R.one_arg(a);if(!a1){R.send(ch,'要喝什麼藥水？\n');return;}
+  const o=R.getObjCarry(ch,a1);if(!o){R.send(ch,'你身上沒有那罐藥水.\n');return;}
+  if(o.type!=='POTION'){R.send(ch,'你只能喝藥水.\n');return;}
+  R.act('你喝下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 喝下 $p.',ch,o,null,R.TO_ROOM);
+  for(const i of [1,2,3])objCast(objSpell(o,i),o.values[0],ch,ch,null);
+  R.extractObj(o);
+};
+cmd.recite=function(ch,a){
+  const [a1,r]=R.one_arg(a);const [a2]=R.one_arg(r);
+  if(!a1){R.send(ch,'要念哪一張卷軸？\n');return;}
+  const o=R.getObjCarry(ch,a1);if(!o){R.send(ch,'你身上沒有那張卷軸.\n');return;}
+  if(o.type!=='SCROLL'){R.send(ch,'你只能念卷軸.\n');return;}
+  let v=null,obj=null;
+  if(!a2)v=ch;
+  else if(!(v=R.getCharRoom(ch,a2))&&!(obj=R.getObjHere(ch,a2))){R.send(ch,'你找不到那個目標.\n');return;}
+  R.act('你念出 $p 上的咒文.',ch,o,null,R.TO_CHAR);R.act('$n 念出 $p 上的咒文.',ch,o,null,R.TO_ROOM);
+  ch.wait=Math.max(ch.wait,4);
+  for(const i of [1,2,3])objCast(objSpell(o,i),o.values[0],ch,v,obj);
+  if(!o.deleted)R.extractObj(o);
+};
+cmd.brandish=function(ch){
+  const o=R.getEq(ch,17);
+  if(!o){R.send(ch,'你手上沒有握著任何東西.\n');return;}
+  if(o.type!=='STAFF'){R.send(ch,'你只能揮舞法杖.\n');return;}
+  const sn=objSpell(o,3);if(sn<=0){R.send(ch,'它沒有任何反應.\n');return;}
+  ch.wait=Math.max(ch.wait,12);
+  if(o.values[2]>0){
+    R.act('你揮舞 $p.',ch,o,null,R.TO_CHAR);R.act('$n 揮舞 $p.',ch,o,null,R.TO_ROOM);
+    const tar=R.SK[sn].tar;
+    for(const v of [...ch.room.people]){
+      if(tar===1){if(v===ch||(ch.npc?v.npc:!v.npc))continue;}
+      else if(tar===2){if(ch.npc?!v.npc:v.npc)continue;}
+      else if(tar===3){if(v!==ch)continue;}
+      else if(v!==ch)continue;
+      objCast(sn,o.values[0],ch,v,null);
+      if(ch.deleted||!ch.room)return;
+    }
+    o.values[2]--;
+  }
+  if(o.values[2]<=0){R.act('你的 $p 化成灰燼了.',ch,o,null,R.TO_CHAR);R.act('$n 的 $p 化成灰燼了.',ch,o,null,R.TO_ROOM);R.extractObj(o);}
+};
+cmd.zap=function(ch,a){
+  const [a1]=R.one_arg(a);
+  const o=R.getEq(ch,17);
+  if(!o){R.send(ch,'你手上沒有握著任何東西.\n');return;}
+  if(o.type!=='WAND'){R.send(ch,'你只能使用魔杖.\n');return;}
+  let v=null,obj=null;
+  if(!a1){if(!(v=ch.fighting)){R.send(ch,'要對誰或什麼使用？\n');return;}}
+  else if(!(v=R.getCharRoom(ch,a1))&&!(obj=R.getObjHere(ch,a1))){R.send(ch,'你找不到那個目標.\n');return;}
+  const sn=objSpell(o,3);if(sn<=0){R.send(ch,'它沒有任何反應.\n');return;}
+  ch.wait=Math.max(ch.wait,12);
+  if(o.values[2]>0){
+    if(v){R.act('你用 $p 指向 $N.',ch,o,v,R.TO_CHAR);R.act('$n 用 $p 指向 $N.',ch,o,v,R.TO_NOTVICT);if(v!==ch)R.act('$n 用 $p 指向你.',ch,o,v,R.TO_VICT);}
+    else{R.act('你用 $p 指向 $P.',ch,o,obj,R.TO_CHAR);R.act('$n 用 $p 指向 $P.',ch,o,obj,R.TO_ROOM);}
+    objCast(sn,o.values[0],ch,v,obj);
+    o.values[2]--;
+  }
+  if(o.values[2]<=0&&!o.deleted){R.act('你的 $p 爆炸了.',ch,o,null,R.TO_CHAR);R.act('$n 的 $p 爆炸了.',ch,o,null,R.TO_ROOM);R.extractObj(o);}
 };
 })(ROC);
