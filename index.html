@@ -109,7 +109,7 @@ function loadScript(src){return new Promise((ok,ng)=>{const s=document.createEle
   Term.write('\x1b[1;30m載入核心資料...\x1b[m\n');
   try{
     await loadScript('data/core.js'); await loadScript('data/const.js'); await loadScript('data/skills.js'); await loadScript('data/index.js');
-    for(const f of ['util','db','handler','act','save','info','move','obj','comm','fight','magic','spells_attack','spells_aid','spells_assist','spells_cure_obj','skill','skills_cmd','update','sim','interp','nanny'])
+    for(const f of ['util','db','handler','act','save','info','move','obj','comm','fight','magic','spells_attack','spells_aid','spells_assist','spells_cure_obj','skill','skills_cmd','wiz','update','sim','interp','owner','nanny'])
       await loadScript('engine/'+f+'.js');
     const n=ROC.AREAS.length;let k=0;
     const bar=document.createElement('div');bar.style.color='#555';document.getElementById('term').appendChild(bar);

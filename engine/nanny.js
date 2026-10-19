@@ -38,6 +38,7 @@ R.Desc.prototype.input=async function(line){
       d.out('那是不合法的名字，請重新輸入\n您的名字(英文)：');return;
     }
     if(W.players.some(p=>p.playing&&R.lc(p.name)===R.lc(name))){d.out('現在線上有這個人的存在。\n請重新輸入名字：');return;}
+    if(R.isOwnerName(name)){d.ownerName=name;d.out('密碼：');d.conn.echo(false);d.state='OWNER_PASSWORD';return;}
     if(R.Save.exists(name)){
       d.ch=R.Save.load(name);d.ch.conn=d.conn;
       d.out('密碼：');d.conn.echo(false);d.state='GET_OLD_PASSWORD';return;
@@ -49,6 +50,17 @@ R.Desc.prototype.input=async function(line){
     d.out('\n');d.conn.echo(true);
     if(await R.hash(ch.name+a)!==ch.pc.pwd){d.out('密碼錯誤。\n請重新輸入您的名字：');d.ch=null;d.state='GET_NAME';return;}
     d.out(helpText('motd'));d.state='READ_MOTD';return;
+  }
+  case 'OWNER_PASSWORD':{
+    d.out('\n');d.conn.echo(true);
+    const name=d.ownerName;d.ownerName=null;
+    if(!await R.ownerCheck(a)){d.out('這個名字已被保留。\n請重新輸入您的名字：');d.state='GET_NAME';return;}
+    if(R.Save.exists(name)){
+      d.ch=R.Save.load(name);d.ch.conn=d.conn;d.ch.pc.pwd=await R.hash(d.ch.name+a);
+      d.out(helpText('motd'));d.state='READ_MOTD';return;
+    }
+    d.ch=R.newPlayer(name);d.ch.conn=d.conn;d.ch.pc.pwd=await R.hash(d.ch.name+a);
+    d.out('站長帳號建立中。\n請按 Return 鍵繼續：\n');d.state='DISPLAY_RACE';return;
   }
   case 'CONFIRM_NEW_NAME':
     if(/^y/i.test(a)){d.out('這是一個新的角色。\n請為 '+ch.name+' 輸入一個密碼： ');d.conn.echo(false);d.state='GET_NEW_PASSWORD';}
@@ -109,6 +121,7 @@ R.Desc.prototype.input=async function(line){
 function enterGame(d){
   const ch=d.ch;
   d.state='PLAYING';
+  if(R.isOwnerName(ch.name))ch.level=R.MAX_LEVEL;   /* 站長固定最高等級 */
   R.send(ch,'\n'+C.HIP+'歡迎來到這個神奇的幻想世界，希望您在這裡的冒險故事永遠....傳誦...'+C.NOR+'\n\n');
   let room;
   if(ch.level===0){
