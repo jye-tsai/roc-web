@@ -479,6 +479,8 @@ const kwOf=v=>{const m=R.strip(R.PERS(v,me())).match(/\(([^()]+)\)\s*$/);return 
 function normalKeys(ch){
   const bs=[['物品','@inv',''],['狀態','score',''],['技能','@sk',''],['指令…','@cmd','']];
   if(!ch||!ch.room)return bs;
+  const home=R.getRoom(ch.room.area.recall)||R.getRoom(R.ROOM_TEMPLE);
+  if(ch.room!==home)bs.push(['回城','recall','']);
   const P=R.POS,pos=ch.position;
   if(pos===P.SLEEPING)bs.push(['醒來','wake','ctx']);
   else if(pos<P.STANDING&&pos>P.SLEEPING)bs.push(['站起','stand','ctx']);
@@ -517,7 +519,7 @@ function renderCombatKeys(){
     const bs=normalKeys(ch),sig='N'+bs.map(b=>b.join('|')).join(';');
     if(sig!==combatSig){combatSig=sig;box.classList.remove('combat');box.innerHTML=bs.map(keyBtn).join('');}
     return;}
-  const bs=[['逃跑','flee','warn']];
+  const bs=[['逃跑','flee','warn'],['回城','recall','warn']];
   const {sp,act}=learnedList(ch);
   for(const sn of act){const s=SK()[sn],[c,mode]=SKILL_CMD[s.name];if(['fight','none'].includes(mode)&&!['hide','sneak'].includes(s.name))bs.push([s.cname,c,'']);}
   for(const sn of [...sp].reverse()){const s=SK()[sn];if(s.tar===1&&bs.length<11)bs.push([s.cname,castCmd(sn),ch.mana<s.mana?'dis':'sp']);}
