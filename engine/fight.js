@@ -137,12 +137,15 @@ function damage(ch,v,dam,i,n,sn){
       R.send(v,C.HIR+'你被殺死了！！'+C.NOR+'\n\n');break;
   }
   if(v.position===P.DEAD){
+    if(R.MP){R.MP.death(v,ch);R.MP.kill(ch,v);if(v.deleted||!v.room)return;}
     if(!ch.npc&&v.npc)groupGain(ch,v);
     if(!v.npc&&ch!==v){R.sendAll&&R.chatAll&&R.chatAll(C.HIR+R.sprintf(CORE.deathnews[1],v.name,ch.short||ch.name)+C.NOR);}
     rawKill(ch,v);
     return;
   }
   if(v===ch)return;
+  if(R.MP&&v.npc&&sn>=0)R.MP.hurt(v,ch,sn);
+  if(v.deleted||!v.room)return;
   /* 怪物逃跑 */
   if(v.npc&&!v.act.has('SENTINEL')&&v.hit<Math.floor(v.max_hit/8)&&R.pct()<25&&v.wait===0)cmd.flee(v,'');
   if(!v.npc&&v.hit>0&&v.hit<=v.wimpy&&v.wait===0)cmd.flee(v,'');
@@ -308,7 +311,7 @@ R.violenceUpdate=function(){
   for(const ch of W.chars.concat(W.players)){
     const v=ch.fighting;if(!v||ch.deleted)continue;
     if(v.deleted||v.room!==ch.room){R.stopFighting(ch,false);continue;}
-    if(R.isAwake(ch)&&ch.position>=P.FIGHTING)R.multiHit(ch,v);
+    if(R.isAwake(ch)&&ch.position>=P.FIGHTING){R.multiHit(ch,v);if(R.MP&&!ch.deleted&&ch.fighting)R.MP.round(ch);}
     else if(ch.position<P.FIGHTING&&ch.position>P.STUNNED)ch.position=P.FIGHTING;
   }
 };

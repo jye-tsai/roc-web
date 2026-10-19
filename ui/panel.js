@@ -162,6 +162,22 @@ function renderPins(force){
 
 /* ---- 畫面文字可以點：名字(keyword)、look xxx、出口方向 ---- */
 const DIRW='north|south|east|west|up|down';
+/* 畫面上出現過的 (英文關鍵字)：NPC 的話題多半這樣提示，例如「報酬(reward)」 */
+const seenKw=new Set();
+/* NPC 劇本裡的話題 → 按鈕要送的字（'p 片語' 去掉 p，多個關鍵字取第一個） */
+function topicWords(v){
+  if(!R.MP)return [];
+  return R.MP.topics(v).map(a=>{a=a.trim();return /^p\s/i.test(a)?a.slice(2).trim():a.split(/\s+/)[0];}).filter((w,i,arr)=>w&&arr.indexOf(w)===i);
+}
+function talkButtons(ch,v,r){
+  if(!R.MP||!R.MP.canTalk(v))return '';
+  let h=btn('交談','talk '+r,'pri');
+  const all=topicWords(v);
+  /* 只列出你看過提示的話題，加上常見的是／否，避免直接爆雷 */
+  for(const w of all)if(seenKw.has(R.lc(w))||/^(yes|no|ok)$/i.test(w))h+=btn('問「'+esc(w)+'」','talk '+r+' '+w,'pri');
+  if(all.length)h+=btnFill('問其他…','talk '+r+' ');
+  return h;
+}
 /* 依關鍵字判斷種類，用來上色：怪物、玩家、物品、其他 */
 let kwIndex=null;
 function kwKind(kw){
@@ -194,7 +210,7 @@ function linkify(t){
   t=t.replace(/\b((?:look|help) [A-Za-z][A-Za-z']*)/gi,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 中文名(english keyword) */
   t=t.replace(/([^\s()<>\[\]，。、：:；;「」]{0,8})\(([A-Za-z][A-Za-z0-9'\- ]{0,40})\)/g,
-    (m,pre,kw)=>'<u class="lk '+kwKind(kw)+'" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>');
+    (m,pre,kw)=>{for(const w of R.lc(kw.trim()).split(/\s+/))seenKw.add(w);seenKw.add(R.lc(kw.trim()));return '<u class="lk '+kwKind(kw)+'" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>';});
   return t;
 }
 /* look 指令找物品的順序（身上→地上，含額外描述），用來算 N.關鍵字 */
@@ -227,6 +243,7 @@ function ctxMenu(kw,label){
         if(v.npc)h+=btn('評估','consider '+r);
         if(v.npc&&v!==f)h+=btn('攻擊','kill '+r,'warn');
         if(v.shop)h+=btn('商品','list','pri');
+        if(v.npc)h+=talkButtons(ch,v,r);
         if(v.psk)h+=btn('學技能','practice','pri');
         if(!v.npc)h+=btn('跟隨','follow '+r);
         const {sp,act}=learnedList(ch);
@@ -258,6 +275,14 @@ function ctxMenu(kw,label){
       h+='</div>';
     }
     /* 其他（房間的額外描述、看不到的東西） */
+    /* 不是人也不是東西：可能是 NPC 提示的話題 */
+    if(!h){
+      for(const v of ch.room.people.filter(v=>v.npc&&R.canSee(ch,v)&&R.MP&&R.MP.canTalk(v))){
+        const w=topicWords(v).find(w=>R.lc(w)===k||R.lc(w)===k.split(/\s+/)[0]);
+        const r=refChar(ch,v);if(!w||!r)continue;
+        h+='<div class="pt">話題「'+esc(w)+'」</div><div class="pa">'+btn('問 '+esc(R.strip(R.PERS(v,ch))),'talk '+r+' '+w,'pri')+'</div>';
+      }
+    }
     if(!h&&kwKind(k)==='pc'){const n=R.cap(k);h='<div class="pt">'+esc(label)+' <small>玩家</small></div><div class="pa">'+btnFill('密語 '+esc(n)+'…','tell '+n+' ')+btn('線上玩家','who')+'</div>';}
     if(!h){const w=k.split(/\s+/)[0];h='<div class="pt">'+esc(label)+'</div><div class="pa">'+btn('看','look '+w)+btn('說明','help '+w)+'</div>';}
   }
@@ -301,6 +326,19 @@ function renderChoices(){
   lastCh=h;el.innerHTML=h;el.classList.toggle('on',!!h);
 }
 
+/* ---- 房間／物品劇本的特殊指令（room_command、obj_command） ---- */
+function specialButtons(ch,x){
+  const ps=(x.progs||(x.proto&&x.proto.programs)||[]).filter(p=>p.trigger==='room_command'||p.trigger==='obj_command');
+  const seen=new Set();let h='';
+  for(const p of ps){
+    const a=String(p.argument||'').trim().split(/\s+/);if(!a[0])continue;
+    const isObj=!x.progs&&!x.npc;
+    const c=a[1]&&a[1]!=='default'?a[0]+' '+a[1]:a[0]+(isObj?' '+String(x.name||'').split(/\s+/)[0]:'');
+    if(seen.has(c))continue;seen.add(c);
+    h+=btn(esc(c),c);
+  }
+  return h;
+}
 /* ---- 門與容器 ---- */
 const DIR_CN=['北','東','南','西','上','下'];
 const hasKey=(ch,k)=>k!=null&&k>0&&ch.carrying.some(o=>o.vnum===k);
@@ -360,7 +398,7 @@ const CMD_CAT=[
  ['戰鬥',[['kill','攻擊','npc'],['murder','攻擊玩家','char'],['flee','逃跑'],['rescue','解救','char'],['backstab','背刺','npc'],['kick','飛腿'],['bashhead','頭部猛擊'],
    ['disarm','擊落武器'],['berserk','全力猛攻'],['frenzy','狂暴攻擊'],['bashdoor','撞門','dir'],['hide','藏匿'],['sneak','潛行'],['peek','窺視','char'],
    ['steal','偷竊','text'],['wimpy','設定逃跑血量','text']]],
- ['溝通',[['say','說話','text'],['chat','閒聊頻道','text'],['question','新手發問','text'],['answer','老手回答','text'],['music','心情點播','text'],
+ ['溝通',[['talk','和 NPC 交談','npc'],['say','說話','text'],['chat','閒聊頻道','text'],['question','新手發問','text'],['answer','老手回答','text'],['music','心情點播','text'],
    ['auction','拍賣','text'],['shout','喊叫','text'],['yell','吶喊','text'],['rumor','謠言','text'],['emote','動作','text'],['tell','密語','pc'],['reply','回覆密語','text'],['dice','擲骰子','text']]],
  ['設定',[['save','存檔'],['practice','學技能'],['config','設定一覽'],['channels','頻道設定'],['autoexit','自動顯示出口'],['autogold','自動撿錢'],['autoloot','自動撿屍體'],
    ['combine','合併物品'],['blank','空行'],['brief','簡短描述'],['compact','精簡模式'],['prompt','提示列格式','text'],['title','稱號','text'],['password','改密碼','text'],['quit','離開遊戲','warn']]],
@@ -468,6 +506,7 @@ function invActions(ch,o){
   if(o.type==='SCROLL'){a+=btn('念（自己）','recite '+r,'pri')+'<button data-recite="'+esc(keyOf(o))+'">對…念</button>';}
   if(ITEM_USE[o.type]){const pinned=getPins(ch).some(p=>p.k==='i'&&p.v===o.vnum);a+='<button data-pini="'+o.vnum+'" class="pin">'+(pinned?'★ 取消釘選':'☆ 釘到快捷列')+'</button>';}
   a+=containerButtons(ch,o,refHere(ch,o));
+  a+=specialButtons(ch,o);
   if(/CONTAINER/.test(o.type))a+='<button data-put="'+esc(keyOf(o))+'">放東西進去…</button>';
   const rh=refHere(ch,o);if(rh)a+=btn('檢視','examine '+rh);
   a+='<button data-give="'+esc(keyOf(o))+'">給…</button>';
@@ -552,6 +591,7 @@ function renderRoom(ch){
   const list=ch.room.contents;
   let h='<div class="top">'+(list.length?btn('撿全部','get all','pri'):'')+'<span class="hint">'+esc(R.strip(ch.room.name||''))+'</span></div>';
   const doors=doorButtons(ch);if(doors)h+='<div class="sec">門</div>'+doors;
+  const sp=specialButtons(ch,ch.room);if(sp)h+='<div class="sec">這裡可以做的事</div><div class="grid">'+sp+'</div>';
   h+=shopSection(ch);
   if(list.length&&(doors||shopHere(ch)))h+='<div class="sec">地上</div>';
   if(!list.length)return h+(doors||shopHere(ch)?'':'<div class="hint pad">地上什麼都沒有。</div>');

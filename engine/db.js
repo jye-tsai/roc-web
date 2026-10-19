@@ -14,7 +14,7 @@ R.bootDb=function(){
     for(const [v,r] of Object.entries(a.rooms||{})){
       const room={vnum:+v,name:r.name,desc:r.description||'',flags:new Set(r.flags||[]),
         sector:Math.max(0,R.SECT.indexOf(r.sector)),exits:[],people:[],contents:[],
-        extra:r.extra_descriptions||[],area,resets:r.resets||null};
+        extra:r.extra_descriptions||[],area,resets:r.resets||null,progs:r.programs||[]};
       for(const [dn,e] of Object.entries(r.exits||{})){
         const d=R.DIRS.indexOf(dn);if(d<0)continue;
         const locks=new Set(e.locks||[]);
@@ -31,6 +31,7 @@ R.bootDb=function(){
     if(o.item_type==='CORPSE_NPC'&&!W.corpseNpc&&/%s/.test(o.short_description))W.corpseNpc=o;
     if(o.item_type==='CORPSE_PC'&&!W.corpsePc)W.corpsePc=o;
   }
+  R.MP&&R.MP.init();
   for(const a of W.areas)R.resetArea(a);
 };
 R.getRoom=v=>W.rooms[v];
@@ -81,6 +82,7 @@ R.resetRoom=function(room,fullAge){
       const op=W.objs[e.vnum];if(!op)continue;
       const o=R.createObject(op,lv);if(m.shop)o.shopInv=true;R.objToChar(o,m);
     }
+    R.MP&&R.MP.repop(m);
   }
   if(room.area.nplayer>0&&!fullAge)return;
   for(const orr of rs.objects||[]){
@@ -88,10 +90,12 @@ R.resetRoom=function(room,fullAge){
     if(room.contents.some(o=>o.vnum===orr.vnum))continue;
     const o=R.createObject(p);R.objToRoom(o,room);
     for(const c of orr.contains||[]){const cp=W.objs[c.vnum];if(cp)R.objToObj(R.createObject(cp),o);}
+    R.MP&&R.MP.objRepop(o);
   }
 };
 R.resetArea=function(a){
   for(const r of a.rooms){
+    r.exits.forEach((e,i)=>{if(e&&e.temp)r.exits[i]=null;});   /* 劇本開出來的門在重置時收回（推測） */
     for(const e of r.exits)if(e&&e.isdoor){e.closed=e.init.closed;e.locked=e.init.locked;}
     R.resetRoom(r,a.nplayer===0);
   }

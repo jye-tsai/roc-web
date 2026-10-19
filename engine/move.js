@@ -21,9 +21,13 @@ R.moveChar=function(ch,door,fFlee){
   }
   const verb=to.sector===6||from.sector===6?'游去':'走去';
   if(!ch.wizinvis)R.act(C.GRN+'$n'+C.GRN+'往'+R.DIR_NAME[door]+verb+'。'+C.NOR,ch,null,null,R.TO_ROOM);
+  R.MP&&R.MP.leave(ch,from,door);
+  if(ch.room!==from)return true;
   R.charToRoom(ch,to);
   if(!ch.wizinvis)R.act('$n走了過來。',ch,null,null,R.TO_ROOM);   /* 推測：抵達訊息未在原始碼擷取 */
   if(!ch.npc)cmd.look(ch,'auto');
+  R.MP&&R.MP.enter(ch,from,door);
+  if(ch.room!==to)return true;
   /* 跟隨者 */
   for(const f of [...from.people])if(f.master===ch&&f.position===P.STANDING){R.act('你跟隨著$N。',f,null,ch,R.TO_CHAR);R.moveChar(f,door);}
   if(!ch.npc)R.aggrCheck&&R.aggrCheck(ch);

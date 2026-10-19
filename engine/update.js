@@ -11,6 +11,7 @@ const outdoorsAwake=s=>{for(const p of W.players)if(p.playing&&R.isAwake(p)&&p.r
 function weatherUpdate(){
   const t=R.time,w=R.weather;
   if(++t.hour===24){t.hour=0;t.day++;}
+  R.MP&&R.MP.hour();
   if(t.day>=35){t.day=0;t.month++;}
   if(t.month>=17){t.month=0;t.year++;}
   switch(t.hour){
@@ -117,12 +118,13 @@ R.pulse=function(){
     for(const p of W.players)if(p.wait>0)p.wait--;
     for(const m of W.chars)if(m.wait>0)m.wait--;
     if(--pv<=0){pv=12;R.violenceUpdate();}
-    if(--pm<=0){pm=16;mobileUpdate();}
-    if(--pt<=0){pt=R.rand(100,140);weatherUpdate();charUpdate();objUpdate();R.Sim&&R.Sim.tick&&R.Sim.tick();}
+    if(--pm<=0){pm=16;mobileUpdate();R.MP&&R.MP.randUpdate();}
+    if(--pt<=0){pt=R.rand(100,140);weatherUpdate();charUpdate();objUpdate();R.MP&&R.MP.tick();R.Sim&&R.Sim.tick&&R.Sim.tick();}
     if(--pa<=0){pa=240;areaUpdate();}
     if(--ps<=0){ps=1200;for(const p of W.players)if(p.playing&&p.level>=2)R.Save.save(p);}
     R.Sim&&R.Sim.pulse&&R.Sim.pulse();
     R.magicPulse&&R.magicPulse();
+    R.MP&&R.MP.pulse();
     R.runQueued&&R.runQueued();
   }catch(e){console.error(e);}
   R.flushAll();

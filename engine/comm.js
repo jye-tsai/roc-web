@@ -10,6 +10,7 @@ cmd.say=function(ch,a){
   R.act('$n'+C.HIG+'說著「$T」'+C.NOR,ch,null,a,R.TO_ROOM);
   R.act(C.HIG+'你說「$T」'+C.NOR,ch,null,a,R.TO_CHAR);
   /* 讓 NPC 對打招呼有點反應（簡化，原版靠 mob program） */
+  R.MP&&R.MP.say(ch,a);
   if(/^(hi|hello|你好|嗨|哈囉)/i.test(a))for(const m of ch.room.people)if(m.npc&&m!==ch&&R.isAwake(m)&&R.pct()<40){R.act('$n對$N點點頭。',m,null,ch,R.TO_NOTVICT);R.act('$n對你點點頭。',m,null,ch,R.TO_VICT);break;}
 };
 const CH={chat:['【閒聊】',C.HIC,0],music:['【心情點播】',C.WHT,0],question:['【新手發問】',C.HIG,0],answer:['【老手回答】',C.HIG,0],
@@ -85,6 +86,7 @@ R.doSocial=function(ch,name,a){
   if(!v){R.send(ch,'這裡沒有這個人。\n');return true;}
   if(v===ch){if(s[7])R.act(s[7],ch,null,v,R.TO_ROOM);if(s[6])R.act(s[6],ch,null,v,R.TO_CHAR);return true;}
   if(s[4])R.act(s[4],ch,null,v,R.TO_NOTVICT);if(s[3])R.act(s[3],ch,null,v,R.TO_CHAR);if(s[5])R.act(s[5],ch,null,v,R.TO_VICT);
+  if(R.MP&&R.MP.has(v,'act_prog')){R.MP.social(ch,v,name);return true;}
   /* NPC 回應（對應原版 social 的 npc 反應） */
   if(v.npc&&R.isAwake(v)&&!v.fighting&&R.pct()<50){
     const r=R.CONST.socials.filter(x=>x[3]&&/smile|nod|bow|wave|grin|hug|poke|slap|laugh/.test(x[0]));

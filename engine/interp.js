@@ -22,6 +22,8 @@ R.interpret=function(ch,line){
   if(!line)return;
   if(ch.wait>0&&!ch.npc){ch.inq=ch.inq||[];if(ch.inq.length<20)ch.inq.push(line);return;}
   let word,arg;
+  /* 房間／物品劇本的自訂指令（room_command、room_mask、obj_command）優先 */
+  if(!ch.npc&&R.MP){const [w0,a0]=R.one_arg(line);if(R.MP.command(ch,w0,a0))return;}
   if(!/^[a-z0-9]/i.test(line[0])&&ALIAS[line[0]]){word=ALIAS[line[0]];arg=line.slice(1).trim();}
   else{[word,arg]=R.one_arg(line);word=word.toLowerCase();arg=(arg||'').trim();if(ALIAS[word])word=ALIAS[word];}
   /* 原版指令表 */

@@ -78,13 +78,14 @@ cmd.give=function(ch,a){
     const n=+a1;[a2]=R.one_arg(r2);const v=R.getCharRoom(ch,a2);
     if(!v){R.send(ch,'這裡沒有這個人。\n');return;}
     if(ch.gold<n||n<=0){R.send(ch,'你沒有那麼多錢.\n');return;}
-    ch.gold-=n;v.gold+=n;R.act('你給了$N '+n+' 枚金幣.',ch,null,v,R.TO_CHAR);R.act('$n給了你 '+n+' 枚金幣.',ch,null,v,R.TO_VICT);R.act('$n給了$N一些金幣.',ch,null,v,R.TO_NOTVICT);return;
+    ch.gold-=n;v.gold+=n;R.act('你給了$N '+n+' 枚金幣.',ch,null,v,R.TO_CHAR);R.act('$n給了你 '+n+' 枚金幣.',ch,null,v,R.TO_VICT);R.act('$n給了$N一些金幣.',ch,null,v,R.TO_NOTVICT);R.MP&&R.MP.bribe(ch,v,n);return;
   }
   const o=R.getObjCarry(ch,a1);if(!o){R.send(ch,'你沒有那樣東西.\n');return;}
   const v=R.getCharRoom(ch,a2);if(!v){R.send(ch,'這裡沒有這個人。\n');return;}
   if(R.carryN(v)+1>R.canCarryN(v)){R.act('$N的手上已經拿滿東西了。',ch,null,v,R.TO_CHAR);return;}
   R.objToChar(o,v);
   R.act('你給了$N$p。',ch,o,v,R.TO_CHAR);R.act('$n給了你$p。',ch,o,v,R.TO_VICT);R.act('$n給了$N$p。',ch,o,v,R.TO_NOTVICT);
+  R.MP&&R.MP.give(ch,v,o);
 };
 cmd.put=function(ch,a){
   let [a1,r]=R.one_arg(a);let [a2,r2]=R.one_arg(r);if(a2==='in'||a2==='into')[a2]=R.one_arg(r2);
@@ -197,7 +198,7 @@ cmd.eat=function(ch,a){
   const o=R.getObjCarry(ch,a1);if(!o){R.send(ch,'你沒有那樣東西.\n');return;}
   if(!/FOOD|PILL/.test(o.type)&&!R.isImm(ch)){R.send(ch,'那不能吃.\n');return;}
   R.act('你吃下 $p.',ch,o,null,R.TO_CHAR);R.act('$n 吃下 $p.',ch,o,null,R.TO_ROOM);
-  ch.pc.cond[1]=Math.min(100,ch.pc.cond[1]+(o.values[0]||5)*2);
+  if(ch.pc)ch.pc.cond[1]=Math.min(100,ch.pc.cond[1]+(o.values[0]||5)*2);
   if(o.type==='PILL')for(const i of [1,2,3])objCast(objSpell(o,i),o.values[0],ch,ch,null);
   R.extractObj(o);
 };
@@ -208,7 +209,7 @@ cmd.drink=function(ch,a){
   if(o.type!=='FOUNTAIN'&&o.type!=='DRINK_CON'){R.send(ch,'你不能從那裡喝水.\n');return;}
   if(o.type==='DRINK_CON'){if(o.values[1]<=0){R.send(ch,'它已經空了.\n');return;}o.values[1]--;}
   R.act('你從 $p 喝了一些東西.',ch,o,null,R.TO_CHAR);R.act('$n 從 $p 喝了一些東西.',ch,o,null,R.TO_ROOM);
-  ch.pc.cond[2]=Math.min(100,ch.pc.cond[2]+10);
+  if(ch.pc)ch.pc.cond[2]=Math.min(100,ch.pc.cond[2]+10);
 };
 
 /* ---- 商店 ---- */
