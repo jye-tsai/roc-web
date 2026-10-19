@@ -107,6 +107,12 @@
   /* 可點的文字 */
   #term .lk{text-decoration:underline dotted #666;text-underline-offset:3px;cursor:pointer}
   #term .lk:active{background:#333}
+  /* 可點文字依種類上色：怪物橘、玩家粉紫、物品綠、指令／出口青 */
+  #term .lk.mob{color:#fa5;text-decoration-color:#a63}
+  #term .lk.pc{color:#e8f;text-decoration-color:#859}
+  #term .lk.obj{color:#7e7;text-decoration-color:#474}
+  #term .lk.cmd{color:#5ff;text-decoration-color:#277}
+  #term .lk.ex{color:#ee8;text-decoration-color:#775}
   /* 點文字跳出的動作選單 */
   #pop{display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);align-items:flex-end}
   #pop.on{display:flex}
@@ -284,7 +290,7 @@
 /* ===== 載入器 ===== */
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261019d';
+const V='20261019e';
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){
   Term.write('\x1b[1;30m載入核心資料...\x1b[m\n');

@@ -162,18 +162,39 @@ function renderPins(force){
 
 /* ---- 畫面文字可以點：名字(keyword)、look xxx、出口方向 ---- */
 const DIRW='north|south|east|west|up|down';
+/* 依關鍵字判斷種類，用來上色：怪物、玩家、物品、其他 */
+let kwIndex=null;
+function kwKind(kw){
+  const k=R.lc(kw.trim());
+  if(!kwIndex){
+    kwIndex={};
+    const add=(s,t)=>{const re=/\(([A-Za-z][A-Za-z0-9'\- ]{0,40})\)/g;let m;while((m=re.exec(R.strip(s||''))))if(!kwIndex[R.lc(m[1])])kwIndex[R.lc(m[1])]=t;};
+    for(const p of Object.values(R.world.mobs||{}))add(p.short_description,'mob');
+    for(const p of Object.values(R.world.objs||{}))add(p.short_description,'obj');
+  }
+  const ch=me(),tag='('+k+')',has=s=>R.lc(R.strip(s||'')).includes(tag);
+  if(ch&&ch.room){
+    const w=k.split(/\s+/)[0];
+    for(const v of ch.room.people)if(has(R.PERS(v,ch))||(!v.npc&&R.lc(v.name)===k)||(v.npc&&R.is_name(w,v.name)))return v.npc?'mob':'pc';
+    if([...ch.room.contents,...ch.carrying].some(o=>has(o.short)||R.is_name(w,o.name)))return 'obj';
+    if(ch.room.extra.some(e=>R.is_name(k.split(/\s+/)[0],e.keywords||'')))return 'ex';
+  }
+  if(R.world.players.some(p=>p.playing&&R.lc(p.name)===k))return 'pc';
+  if(R.Sim&&R.simOn&&R.Sim.who().some(s=>R.lc(s.name)===k))return 'pc';
+  return kwIndex[k]||'';
+}
 function linkify(t){
   if(!/[A-Za-z]/.test(t))return t;
   /* 只有方向字的片段（[出口: south up] 的彩色部分） */
   if(new RegExp('^\\s*('+DIRW+')(\\s+('+DIRW+'))*\\s*$','i').test(t))
-    return t.replace(new RegExp('\\b('+DIRW+')\\b','gi'),'<u class="lk" data-cmd="$1">$1</u>');
+    return t.replace(new RegExp('\\b('+DIRW+')\\b','gi'),'<u class="lk cmd" data-cmd="$1">$1</u>');
   /* exits 列表：North  - 某某地方 */
-  t=t.replace(/^(North|South|East|West|Up|Down)(?=\s+-)/gm,m=>'<u class="lk" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
+  t=t.replace(/^(North|South|East|West|Up|Down)(?=\s+-)/gm,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 文字裡的指令提示：look sign / help newbie */
-  t=t.replace(/\b((?:look|help) [A-Za-z][A-Za-z']*)/gi,m=>'<u class="lk" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
+  t=t.replace(/\b((?:look|help) [A-Za-z][A-Za-z']*)/gi,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 中文名(english keyword) */
   t=t.replace(/([^\s()<>\[\]，。、：:；;「」]{0,8})\(([A-Za-z][A-Za-z0-9'\- ]{0,40})\)/g,
-    (m,pre,kw)=>'<u class="lk" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>');
+    (m,pre,kw)=>'<u class="lk '+kwKind(kw)+'" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>');
   return t;
 }
 /* look 指令找物品的順序（身上→地上，含額外描述），用來算 N.關鍵字 */
@@ -196,7 +217,10 @@ function ctxMenu(kw,label){
   }else{
     const f=ch.fighting&&ch.fighting.room===ch.room?ch.fighting:null;
     /* 人物／怪物 */
-    for(const v of ch.room.people.filter(v=>R.canSee(ch,v)&&(has(R.PERS(v,ch))||(!v.npc&&R.lc(v.name)===k)))){
+    const w0=k.split(/\s+/)[0];
+    let pv=ch.room.people.filter(v=>R.canSee(ch,v)&&(has(R.PERS(v,ch))||(!v.npc&&R.lc(v.name)===k)));
+    if(!pv.length)pv=ch.room.people.filter(v=>v!==ch&&R.canSee(ch,v)&&R.is_name(w0,v.name));
+    for(const v of pv){
       const r=v===ch?'self':refChar(ch,v);if(!r)continue;
       h+='<div class="pt">'+esc(R.strip(R.PERS(v,ch)))+(v.npc?' <small>Lv'+v.level+'</small>':'')+'</div><div class="pa">'+btn('看','look '+r);
       if(v!==ch){
@@ -218,7 +242,8 @@ function ctxMenu(kw,label){
       h+='</div>';
     }
     /* 物品：地上、身上、裝備 */
-    const objs=[...ch.room.contents,...ch.carrying].filter(o=>has(o.short));
+    let objs=[...ch.room.contents,...ch.carrying].filter(o=>has(o.short));
+    if(!objs.length&&!pv.length)objs=[...ch.room.contents,...ch.carrying].filter(o=>R.is_name(w0,o.name));
     const seen=new Set();
     for(const o of objs){
       const where=o.carried_by===ch||ch.carrying.includes(o)?(o.wear_loc>=0?'eq':'inv'):'room';
@@ -233,6 +258,7 @@ function ctxMenu(kw,label){
       h+='</div>';
     }
     /* 其他（房間的額外描述、看不到的東西） */
+    if(!h&&kwKind(k)==='pc'){const n=R.cap(k);h='<div class="pt">'+esc(label)+' <small>玩家</small></div><div class="pa">'+btnFill('密語 '+esc(n)+'…','tell '+n+' ')+btn('線上玩家','who')+'</div>';}
     if(!h){const w=k.split(/\s+/)[0];h='<div class="pt">'+esc(label)+'</div><div class="pa">'+btn('看','look '+w)+btn('說明','help '+w)+'</div>';}
   }
   pop.querySelector('.pb').innerHTML=h;
