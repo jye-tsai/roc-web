@@ -40,11 +40,57 @@
   .c30{color:#000}.c31{color:#a00}.c32{color:#0a0}.c33{color:#a50}.c34{color:#00a}.c35{color:#a0a}.c36{color:#0aa}.c37{color:#c0c0c0}
   .b.c30{color:#555}.b.c31{color:#f55}.b.c32{color:#5f5}.b.c33{color:#ff5}.b.c34{color:#55f}.b.c35{color:#f5f}.b.c36{color:#5ff}.b.c37{color:#fff}
   .g40{background:#000}.g41{background:#a00}.g42{background:#0a0}.g43{background:#a50}.g44{background:#00a}.g45{background:#a0a}.g46{background:#0aa}.g47{background:#aaa}
+  /* 狀態血條 */
+  #stat{display:none;gap:4px;padding:4px 6px;background:#0a0a0a;border-bottom:1px solid #333;font-size:12px;align-items:center}
+  #stat.on{display:flex}
+  .sb{flex:1;position:relative;height:18px;background:#222;border-radius:3px;overflow:hidden;min-width:0}
+  .sb i{position:absolute;inset:0 auto 0 0;transition:width .3s}
+  .sb span{position:relative;display:block;text-align:center;line-height:18px;color:#fff;text-shadow:0 0 2px #000,0 0 2px #000;white-space:nowrap;overflow:hidden}
+  .sb.hp i{background:#a00}.sb.mp i{background:#00a}.sb.mv i{background:#070}
+  .si{flex:0 1 auto;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34%}
+  .si b{color:#f55}
+  /* 物品／裝備面板 */
+  #sheet{display:none;flex-direction:column;max-height:58%;background:#111;border-top:2px solid #444;font-size:15px}
+  #sheet.on{display:flex}
+  #sheet .tabs{display:flex;border-bottom:1px solid #333}
+  #sheet .tabs button{flex:1;padding:8px 0;background:#181818;color:#888;border:0;border-right:1px solid #333;font:inherit}
+  #sheet .tabs button.cur{background:#2a2a2a;color:#ff5}
+  #sheet .tabs .x{flex:0 0 3em;color:#f55}
+  #sheet .body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+  #sheet .top{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #222;position:sticky;top:0;background:#111}
+  #sheet .it{border-bottom:1px solid #222}
+  #sheet .ih{display:flex;gap:8px;padding:9px 10px;align-items:baseline;cursor:pointer}
+  #sheet .it.open{background:#1c1c1c}
+  #sheet .it.open .ih .nm{color:#ff5}
+  #sheet .nm{flex:1;color:#ddd;min-width:0;overflow-wrap:anywhere}
+  #sheet .nm.hi{color:#a55}
+  #sheet .nm em{color:#5ff;font-style:normal}
+  #sheet .tg{color:#777;font-size:13px;white-space:nowrap}
+  #sheet .sl{color:#0aa;width:4.5em;flex:0 0 auto}
+  #sheet .empty .nm{color:#444}
+  #sheet .empty .ih{padding:3px 10px;font-size:13px}
+  body.sheet-on #keys.on{display:none}
+  #sheet .ia{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 10px}
+  #sheet button{background:#2a2a2a;color:#ccc;border:1px solid #444;border-radius:4px;padding:6px 12px;font:inherit;font-size:14px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  #sheet button:active{background:#555}
+  #sheet button.pri{color:#5f5;border-color:#363}
+  #sheet button.warn{color:#f77;border-color:#633}
+  #sheet .hint{color:#777;font-size:13px;width:100%}
+  #sheet .top .hint{width:auto;flex:1;text-align:right}
+  #sheet .pad{padding:16px}
+  #sheet .sub{width:100%;border-left:2px solid #333;padding-left:8px;display:flex;flex-direction:column;gap:4px}
+  #sheet .subi{display:flex;align-items:center;gap:8px}
+  #sheet .subi span{flex:1}
   .blink{animation:bl 1s step-start infinite}@keyframes bl{50%{opacity:0}}
 </style>
 </head>
 <body>
+<div id="stat"></div>
 <div id="term"></div>
+<div id="sheet">
+  <div class="tabs"><button data-tab="inv">物品</button><button data-tab="eq">裝備</button><button data-tab="room">地上</button><button class="x" data-close>✕</button></div>
+  <div class="body"></div>
+</div>
 <div id="keys">
   <div class="dir">
     <button data-c="up" class="ud">上</button><button data-c="north">北</button><button data-c="look">看</button>
@@ -52,8 +98,8 @@
     <button data-c="down" class="ud">下</button><button data-c="south">南</button><button data-c="scan">掃</button>
   </div>
   <div class="cmds">
-    <button data-c="score">狀態</button><button data-c="inventory">物品</button><button data-c="equipment">裝備</button><button data-c="exits">出口</button>
-    <button data-c="kill " data-fill>攻擊…</button><button data-c="flee">逃跑</button><button data-c="cast " data-fill>施法…</button><button data-c="get all">撿全部</button>
+    <button data-c="score">狀態</button><button data-ui="inv">物品</button><button data-ui="eq">裝備</button><button data-c="exits">出口</button>
+    <button data-c="kill " data-fill>攻擊…</button><button data-c="flee">逃跑</button><button data-c="cast " data-fill>施法…</button><button data-ui="room">地上</button>
     <button data-c="rest">休息</button><button data-c="sleep">睡覺</button><button data-c="wake">醒來</button><button data-c="stand">站起</button>
     <button data-c="who">誰在</button><button data-c="say " data-fill>說話…</button><button data-c="help " data-fill>說明…</button><button data-c="save">存檔</button>
   </div>
@@ -63,6 +109,7 @@
   <button id="bSend" title="送出">送出</button>
   <button id="bKeys" class="tools" title="快捷鍵">鍵盤</button>
   <button id="bFont" class="tools" title="字體大小">字</button>
+  <button id="bBag" class="wide" title="物品／裝備">物品</button>
   <button id="bExport" class="wide" title="匯出存檔">匯出</button>
   <button id="bImport" class="wide" title="匯入存檔">匯入</button>
   <button id="bSim" class="wide" title="模擬線上玩家／頻道">模擬:開</button>
@@ -144,6 +191,9 @@
     b.addEventListener('pointerdown',e=>{if(b.id!=='bSend'||document.activeElement!==cmd)e.preventDefault();});
   document.getElementById('bSend').onclick=()=>{const v=cmd.value;cmd.value='';submit(v,true);if(!touch)cmd.focus();};
   const keys=document.getElementById('keys');
+  window.UI={send:c=>submit(c,c===''),fill:c=>{cmd.value=c;cmd.focus();}};
+  for(const b of keys.querySelectorAll('button[data-ui]'))b.onclick=()=>UIPanel.open(b.dataset.ui);
+  document.getElementById('bBag').onclick=()=>UIPanel.open('inv');
   for(const b of keys.querySelectorAll('button[data-c]'))b.onclick=()=>{
     const c=b.dataset.c;
     if(cmd.type==='password'){cmd.focus();return;}
@@ -153,7 +203,7 @@
   const bk=document.getElementById('bKeys');
   const setKeys=on=>{keys.classList.toggle('on',on);bk.style.color=on?'#5f5':'';ls.set('roc.keys',on?'1':'0');Term.write('');};
   setKeys(ls.get('roc.keys')!=='0');
-  bk.onclick=()=>setKeys(!keys.classList.contains('on'));
+  bk.onclick=()=>{if(document.body.classList.contains('sheet-on')){UIPanel.close();setKeys(true);return;}setKeys(!keys.classList.contains('on'));};
   /* 字體大小：手機預設小一點，點「字」循環切換 */
   const sizes=[11,12,13,14,16,18];
   let fs=+ls.get('roc.fs')||(innerWidth<700?13:16);
@@ -185,6 +235,7 @@ function loadScript(src){return new Promise((ok,ng)=>{const s=document.createEle
     await loadScript('data/core.js'); await loadScript('data/const.js'); await loadScript('data/skills.js'); await loadScript('data/index.js');
     for(const f of ['util','db','handler','act','save','info','move','obj','comm','fight','magic','spells_attack','spells_aid','spells_assist','spells_cure_obj','skill','skills_cmd','wiz','update','sim','interp','owner','nanny'])
       await loadScript('engine/'+f+'.js');
+    await loadScript('ui/panel.js');UIPanel.init();
     const n=ROC.AREAS.length;let k=0;
     const bar=document.createElement('div');bar.style.color='#555';document.getElementById('term').appendChild(bar);
     const B=8;
