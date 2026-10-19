@@ -1,0 +1,163 @@
+/* nanny.js — 登入流程與開機（對應 comm.c nanny） */
+(function(R){
+const C=R.C,W=R.world,CORE=ROC.CORE;
+const DEF_PROMPT='<生命%h魔法%m移動%v> ';
+const PC_RACES=()=>R.CONST.races.map((r,i)=>[r,i]).filter(([r])=>r.abil&1);
+
+function helpText(key){
+  const h=CORE.helps.find(h=>R.is_name(key,h.keywords));
+  return h?String(h.text).replace(/^\./,'')+'\n':'';
+}
+
+R.Desc=function(conn){
+  this.conn=conn;this.state='GET_NAME';this.ch=null;this.tries=0;
+};
+R.Desc.prototype.out=function(s){this.conn.send(R.nl(s));};
+R.Desc.prototype.greet=function(){
+  this.conn.send('\x1b[2J');
+  this.out(R.pick(CORE.greetings)+'\n\n');
+  this.out('想要進入 混沌幻世 世界冒險的英雄名字是？');
+};
+
+function validName(n){
+  if(!/^[A-Za-z]{3,12}$/.test(n))return false;
+  if(/^(all|auto|immortal|self|someone|something|the|you|god)$/i.test(n))return false;
+  if(Object.values(W.mobs).some(p=>R.is_name(n,p.keywords||'')&&R.lc(p.keywords).split(' ').includes(R.lc(n))))return false;
+  return true;
+}
+
+R.Desc.prototype.input=async function(line){
+  const d=this,a=(line||'').trim();
+  let ch=d.ch;
+  switch(d.state){
+  case 'GET_NAME':{
+    if(!a){d.out('想要進入 混沌幻世 世界冒險的英雄名字是？');return;}
+    const name=R.cap(R.lc(a));
+    if(!validName(name)){
+      if(++d.tries>=5){d.out('輸入角色名稱失敗太多次！\n');d.tries=0;}
+      d.out('那是不合法的名字，請重新輸入\n您的名字(英文)：');return;
+    }
+    if(W.players.some(p=>p.playing&&R.lc(p.name)===R.lc(name))){d.out('現在線上有這個人的存在。\n請重新輸入名字：');return;}
+    if(R.Save.exists(name)){
+      d.ch=R.Save.load(name);d.ch.conn=d.conn;
+      d.out('密碼：');d.conn.echo(false);d.state='GET_OLD_PASSWORD';return;
+    }
+    d.ch=R.newPlayer(name);d.ch.conn=d.conn;
+    d.out('您沒輸入錯吧？是 '+name+' 嗎(Y/N)? ');d.state='CONFIRM_NEW_NAME';return;
+  }
+  case 'GET_OLD_PASSWORD':{
+    d.out('\n');d.conn.echo(true);
+    if(await R.hash(ch.name+a)!==ch.pc.pwd){d.out('密碼錯誤。\n請重新輸入您的名字：');d.ch=null;d.state='GET_NAME';return;}
+    d.out(helpText('motd'));d.state='READ_MOTD';return;
+  }
+  case 'CONFIRM_NEW_NAME':
+    if(/^y/i.test(a)){d.out('這是一個新的角色。\n請為 '+ch.name+' 輸入一個密碼： ');d.conn.echo(false);d.state='GET_NEW_PASSWORD';}
+    else if(/^n/i.test(a)){d.out('好吧，那麼再輸入一次：');d.ch=null;d.state='GET_NAME';}
+    else d.out('請輸入 yes 或 no？');
+    return;
+  case 'GET_NEW_PASSWORD':
+    d.out('\n');
+    if(a.length<5){d.out('密碼至少要有五個英文字母或數字\n請重新輸入密碼： ');return;}
+    if(/~/.test(a)){d.out('密碼中有不合法字元，請重新輸入.\nPassword: ');return;}
+    ch.pc.pwd=await R.hash(ch.name+a);
+    d.out('請再輸入一次密碼，以確定您沒記錯：');d.state='CONFIRM_NEW_PASSWORD';return;
+  case 'CONFIRM_NEW_PASSWORD':
+    d.out('\n');
+    if(await R.hash(ch.name+a)!==ch.pc.pwd){d.out('前後兩次密碼不符\n請重新輸入密碼： ');d.state='GET_NEW_PASSWORD';return;}
+    d.conn.echo(true);d.out('\n請按 Return 鍵繼續：\n');d.state='DISPLAY_RACE';return;
+  case 'DISPLAY_RACE':{
+    let s='請選擇一個種族：\n\n';
+    for(const [r] of PC_RACES())s+='  '+r.cname+'('+r.name+')\n';
+    d.out(s+'\n【請輸入種族英文名稱】：');d.state='GET_NEW_RACE';return;
+  }
+  case 'GET_NEW_RACE':{
+    const f=a&&PC_RACES().find(([r])=>R.str_prefix(a,r.name));
+    if(!f){d.out('那並不是一個種族。\n請輸入種族英文名稱？ ');return;}
+    ch.race=f[1];
+    d.out('\n'+helpText(f[0].name)+'您確定要選擇這個種族？(Y/N)  ');d.state='CONFIRM_NEW_RACE';return;
+  }
+  case 'CONFIRM_NEW_RACE':
+    if(!/^y/i.test(a)){d.out('\n請按 Return 鍵繼續：\n');d.state='DISPLAY_RACE';return;}
+    d.out('\n您的性別是？(M 為男性，F 為女性，N 為中性)? ');d.state='GET_NEW_SEX';return;
+  case 'GET_NEW_SEX':{
+    const sx={m:1,f:2,n:0}[R.lc(a[0]||'')];
+    if(sx===undefined){d.out('不合法的性別，請輸入 M, F 或 N\n您的性別是? ');return;}
+    ch.sex=sx;d.out('\n請按 Return 鍵繼續：\n');d.state='DISPLAY_CLASS';return;
+  }
+  case 'DISPLAY_CLASS':{
+    let s='請選擇您的職業：\n\n';
+    for(const c of R.CONST.classes.slice(0,5))s+='  '+c.cname+'('+c.who+')\n';
+    d.out(s+'\n【請輸入職業英文名稱】：');d.state='GET_NEW_CLASS';return;
+  }
+  case 'GET_NEW_CLASS':{
+    const i=a?R.CONST.classes.slice(0,5).findIndex(c=>R.str_prefix(a,c.who)||R.str_prefix(a,c.name)):-1;
+    if(i<0){d.out('那並不是一個職業。\n您的職業是？ ');return;}
+    ch.cls=i;
+    d.out('\n'+helpText(['MAGE','CLERIC','THIEF','WARRIOR','BARBARIAN'][i])+'您確定要選擇這個職業嗎？(Y/N)');d.state='CONFIRM_CLASS';return;
+  }
+  case 'CONFIRM_CLASS':
+    if(!/^y/i.test(a)){d.out('\n請按 Return 鍵繼續：\n');d.state='DISPLAY_CLASS';return;}
+    d.out('\n'+helpText('motd'));d.state='READ_MOTD';return;
+  case 'READ_MOTD':
+    enterGame(d);return;
+  case 'PLAYING':
+    if(!ch||ch.deleted){d.state='GET_NAME';return;}
+    R.interpret(ch,line);R.flush(ch,true);return;
+  }
+};
+
+function enterGame(d){
+  const ch=d.ch;
+  d.state='PLAYING';
+  R.send(ch,'\n'+C.HIP+'歡迎來到這個神奇的幻想世界，希望您在這裡的冒險故事永遠....傳誦...'+C.NOR+'\n\n');
+  let room;
+  if(ch.level===0){
+    const k=R.CONST.classes[ch.cls];
+    const pi={APPLY_STR:0,APPLY_INT:1,APPLY_WIS:2,APPLY_DEX:3,APPLY_CON:4}[k.prime];
+    if(pi!==undefined)ch.perm[pi]=16;
+    ch.level=1;ch.exp=1000;
+    ch.gold=10000+R.fuzzy(3)*R.fuzzy(4)*R.fuzzy(5)*10;
+    ch.hit=ch.max_hit;ch.mana=ch.max_mana;ch.move=ch.max_move;
+    const t=CORE.titles[k.cname];ch.pc.title='- '+(t&&t[1]||'');
+    ch.pc.prompt=DEF_PROMPT;
+    const give=(v,loc)=>{const p=W.objs[v];if(!p)return;const o=R.createObject(p,0);R.objToChar(o,ch);R.equipChar(ch,o,loc);};
+    give(R.OBJ.BANNER,R.WEAR.LIGHT);give(R.OBJ.SHIELD,R.WEAR.SHIELD);give(R.OBJ.BOOK,R.WEAR.HOLD);
+    if(!(R.CONST.races[ch.race].abil&131072)){give(R.OBJ.VEST,R.WEAR.BODY);give(k.weapon,R.WEAR.WIELD);}
+    room=R.getRoom(R.ROOM_SCHOOL);
+  }else room=R.getRoom(ch.savedRoom)||R.getRoom(R.ROOM_TEMPLE);
+  if(!ch.pc.prompt)ch.pc.prompt=DEF_PROMPT;
+  ch.logon=Date.now();ch.playing=true;
+  W.players.push(ch);
+  R.charToRoom(ch,room);
+  R.act('$n 連線進入這個世界.',ch,null,null,R.TO_ROOM);
+  for(const p of W.players)if(p!==ch&&p.playing)R.send(p,C.HIU+'【宣布】'+ch.name+' 進入了混沌幻世。'+C.NOR+'\n');   /* 推測：CHANNEL_SYSTEM 字串 */
+  R.cmds.look(ch,'auto');
+  if(ch.level===1&&ch.exp===1000)R.Save.save(ch);
+  R.flush(ch,true);
+}
+
+R.logout=function(ch){
+  ch.playing=false;
+  R.stopFighting(ch,true);
+  for(const o of [...ch.carrying])R.extractObj(o);
+  if(ch.room)R.charFromRoom(ch);
+  const i=W.players.indexOf(ch);if(i>=0)W.players.splice(i,1);
+  R.flush(ch,true);
+  const d=ch.desc;
+  if(d){d.ch=null;d.state='GET_NAME';setTimeout(()=>{d.out('\n');d.greet();},800);}
+};
+
+R.boot=function(conn){
+  R.bootDb();
+  R.startUpdate();
+  const d=new R.Desc(conn);
+  conn.onInput(async line=>{
+    try{
+      await d.input(line);
+      if(d.ch){d.ch.desc=d;if(d.state==='PLAYING')R.flush(d.ch,true);}
+    }catch(e){console.error(e);conn.send('\x1b[1;31m[錯誤] '+e.message+'\x1b[m\n');}
+  });
+  d.greet();
+  window.addEventListener('beforeunload',()=>{for(const p of W.players)if(p.playing&&!p.noSave)R.Save.save(p);});
+};
+})(ROC);
