@@ -2,15 +2,38 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="混沌幻世">
 <title>混沌幻世 Realm of Chaos — 本機網頁版</title>
 <style>
   html,body{margin:0;height:100%;background:#000;color:#c0c0c0;}
-  body{display:flex;flex-direction:column;font-family:"MingLiU","細明體","Noto Sans Mono CJK TC","Sarasa Mono TC",Consolas,monospace;font-size:16px;}
-  #term{flex:1;overflow-y:auto;padding:6px 10px;white-space:pre-wrap;word-break:break-all;line-height:1.25;}
+  body{position:fixed;inset:0;height:var(--vh,100dvh);display:flex;flex-direction:column;font-family:"MingLiU","細明體","Noto Sans Mono CJK TC","Sarasa Mono TC",Consolas,monospace;font-size:16px;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;-webkit-text-size-adjust:100%;}
+  #term{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 10px;white-space:pre-wrap;word-break:break-all;line-height:1.25;font-size:var(--fs,16px);}
   #bar{display:flex;border-top:1px solid #333;background:#111;}
-  #cmd{flex:1;background:#000;color:#fff;border:0;outline:0;padding:6px 10px;font:inherit;}
-  #bar button{background:#222;color:#aaa;border:0;border-left:1px solid #333;padding:0 10px;font:inherit;cursor:pointer;}
+  #cmd{flex:1;min-width:0;background:#000;color:#fff;border:0;outline:0;padding:8px 10px;font:inherit;font-size:16px;}
+  #bar button,#keys button{background:#222;color:#aaa;border:0;border-left:1px solid #333;padding:0 10px;font:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
   #bar button:hover{color:#fff}
+  #bar button:active,#keys button:active{background:#444;color:#fff}
+  #bSend{color:#ff5!important}
+  /* 手機快捷鍵 */
+  #keys{display:none;background:#111;border-top:1px solid #333;padding:4px;gap:4px;font-size:15px}
+  body.touch #keys.on{display:flex}
+  #keys .dir{display:grid;grid-template-columns:repeat(3,2.6em);grid-auto-rows:2.3em;gap:3px}
+  #keys .cmds{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:2.3em;gap:3px;align-content:start}
+  #keys button{border:1px solid #333;border-radius:4px;padding:0}
+  #keys .dir button{color:#5ff}
+  #keys .dir .ud{color:#ff5}
+  .tools{display:none}
+  @media (max-width:700px){
+    #bar button{padding:0 8px}
+    .wide{display:none}
+    .tools{display:inline-block}
+  }
   .b{font-weight:bold}
   .c30{color:#000}.c31{color:#a00}.c32{color:#0a0}.c33{color:#a50}.c34{color:#00a}.c35{color:#a0a}.c36{color:#0aa}.c37{color:#c0c0c0}
   .b.c30{color:#555}.b.c31{color:#f55}.b.c32{color:#5f5}.b.c33{color:#ff5}.b.c34{color:#55f}.b.c35{color:#f5f}.b.c36{color:#5ff}.b.c37{color:#fff}
@@ -20,11 +43,28 @@
 </head>
 <body>
 <div id="term"></div>
+<div id="keys">
+  <div class="dir">
+    <button data-c="up" class="ud">上</button><button data-c="north">北</button><button data-c="look">看</button>
+    <button data-c="west">西</button><button data-c="">↵</button><button data-c="east">東</button>
+    <button data-c="down" class="ud">下</button><button data-c="south">南</button><button data-c="scan">掃</button>
+  </div>
+  <div class="cmds">
+    <button data-c="score">狀態</button><button data-c="inventory">物品</button><button data-c="equipment">裝備</button><button data-c="exits">出口</button>
+    <button data-c="kill " data-fill>攻擊…</button><button data-c="flee">逃跑</button><button data-c="cast " data-fill>施法…</button><button data-c="get all">撿全部</button>
+    <button data-c="rest">休息</button><button data-c="sleep">睡覺</button><button data-c="wake">醒來</button><button data-c="stand">站起</button>
+    <button data-c="who">誰在</button><button data-c="say " data-fill>說話…</button><button data-c="help " data-fill>說明…</button><button data-c="save">存檔</button>
+  </div>
+</div>
 <div id="bar">
-  <input id="cmd" autocomplete="off" spellcheck="false" autofocus>
-  <button id="bExport" title="匯出存檔">匯出</button>
-  <button id="bImport" title="匯入存檔">匯入</button>
-  <button id="bSim" title="模擬線上玩家／頻道">模擬:開</button>
+  <input id="cmd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" autofocus>
+  <button id="bSend" title="送出">送出</button>
+  <button id="bKeys" class="tools" title="快捷鍵">鍵盤</button>
+  <button id="bFont" class="tools" title="字體大小">字</button>
+  <button id="bExport" class="wide" title="匯出存檔">匯出</button>
+  <button id="bImport" class="wide" title="匯入存檔">匯入</button>
+  <button id="bSim" class="wide" title="模擬線上玩家／頻道">模擬:開</button>
+  <button id="bMore" class="tools" title="更多">⋯</button>
 </div>
 <input type="file" id="fImport" accept=".json" style="display:none">
 <script>
@@ -78,28 +118,60 @@
   window.Conn={
     handler:null,
     send(s){Term.write(s);},
-    echo(on){cmd.type=on?'text':'password';},
+    echo(on){cmd.type=on?'text':'password';if(!on&&document.body.classList.contains('touch'))cmd.focus();},
     onInput(fn){this.handler=fn;}
   };
+  function submit(v,repeat){
+    const pw=cmd.type==='password';
+    if(v===''&&repeat&&!pw&&last)v=last;
+    if(!pw){if(v&&hist[hist.length-1]!==v)hist.push(v);hi=hist.length;last=v;Term.write(v+'\n');}
+    else Term.write('\n');
+    if(Conn.handler)Conn.handler(v);
+  }
   cmd.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){
-      let v=cmd.value;
-      const pw=cmd.type==='password';
-      if(v===''&&!pw&&last)v=last;
-      if(!pw){if(v&&hist[hist.length-1]!==v)hist.push(v);hi=hist.length;last=v;Term.write(v+'\n');}
-      else Term.write('\n');
-      cmd.value='';
-      if(Conn.handler)Conn.handler(v);
+    if(e.key==='Enter'&&!e.isComposing){
+      const v=cmd.value;cmd.value='';submit(v,true);
     }else if(e.key==='ArrowUp'){if(hi>0){hi--;cmd.value=hist[hi];}e.preventDefault();}
     else if(e.key==='ArrowDown'){if(hi<hist.length){hi++;cmd.value=hist[hi]||'';}e.preventDefault();}
   });
-  document.getElementById('term').addEventListener('click',()=>{if(!getSelection().toString())cmd.focus();});
+  /* 手機：偵測觸控、按鈕不搶焦點（避免鍵盤一直跳出來） */
+  const touch=matchMedia('(pointer:coarse)').matches||'ontouchstart' in window;
+  if(touch){document.body.classList.add('touch');cmd.removeAttribute('autofocus');}
+  const ls={get:k=>{try{return localStorage.getItem(k);}catch(e){return null;}},set:(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}}};
+  for(const b of document.querySelectorAll('#bar button,#keys button'))
+    b.addEventListener('pointerdown',e=>{if(b.id!=='bSend'||document.activeElement!==cmd)e.preventDefault();});
+  document.getElementById('bSend').onclick=()=>{const v=cmd.value;cmd.value='';submit(v,true);if(!touch)cmd.focus();};
+  const keys=document.getElementById('keys');
+  for(const b of keys.querySelectorAll('button[data-c]'))b.onclick=()=>{
+    const c=b.dataset.c;
+    if(cmd.type==='password'){cmd.focus();return;}
+    if('fill' in b.dataset){cmd.value=c;cmd.focus();return;}
+    submit(c,c==='');
+  };
+  const bk=document.getElementById('bKeys');
+  const setKeys=on=>{keys.classList.toggle('on',on);bk.style.color=on?'#5f5':'';ls.set('roc.keys',on?'1':'0');Term.write('');};
+  setKeys(ls.get('roc.keys')!=='0');
+  bk.onclick=()=>setKeys(!keys.classList.contains('on'));
+  /* 字體大小：手機預設小一點，點「字」循環切換 */
+  const sizes=[11,12,13,14,16,18];
+  let fs=+ls.get('roc.fs')||(innerWidth<700?13:16);
+  const setFs=v=>{fs=v;document.documentElement.style.setProperty('--fs',v+'px');ls.set('roc.fs',v);};
+  setFs(fs);
+  document.getElementById('bFont').onclick=()=>{const i=sizes.indexOf(fs);setFs(sizes[(i+1)%sizes.length]);Term.write('\x1b[1;30m[字體 '+fs+'px]\x1b[m\n');};
+  /* 「⋯」展開匯出／匯入／模擬 */
+  document.getElementById('bMore').onclick=()=>{for(const b of document.querySelectorAll('#bar .wide'))b.style.display=b.style.display==='inline-block'?'':'inline-block';};
+  /* 虛擬鍵盤彈出時讓畫面跟著縮，輸入列不會被蓋住 */
+  if(window.visualViewport){
+    const fit=()=>{document.body.style.setProperty('--vh',visualViewport.height+'px');window.scrollTo(0,0);const t=document.getElementById('term');t.scrollTop=t.scrollHeight;};
+    visualViewport.addEventListener('resize',fit);fit();
+  }
+  document.getElementById('term').addEventListener('click',()=>{if(!touch&&!getSelection().toString())cmd.focus();});
   document.getElementById('bExport').onclick=()=>ROC.Save&&ROC.Save.exportAll();
   document.getElementById('bImport').onclick=()=>document.getElementById('fImport').click();
   document.getElementById('fImport').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(t=>ROC.Save.importAll(t));};
   const bs=document.getElementById('bSim');
-  bs.onclick=()=>{ROC.simOn=!ROC.simOn;bs.textContent='模擬:'+(ROC.simOn?'開':'關');localStorage.setItem('roc.sim',ROC.simOn?'1':'0');};
-  window.addEventListener('load',()=>{ROC.simOn=localStorage.getItem('roc.sim')!=='0';bs.textContent='模擬:'+(ROC.simOn?'開':'關');});
+  bs.onclick=()=>{ROC.simOn=!ROC.simOn;bs.textContent='模擬:'+(ROC.simOn?'開':'關');ls.set('roc.sim',ROC.simOn?'1':'0');};
+  window.addEventListener('load',()=>{ROC.simOn=ls.get('roc.sim')!=='0';bs.textContent='模擬:'+(ROC.simOn?'開':'關');});
 })();
 
 /* ===== 載入器 ===== */
@@ -121,7 +193,7 @@ function loadScript(src){return new Promise((ok,ng)=>{const s=document.createEle
     await ROC.Store.init();
     Term.write(ROC.Store.mode==='folder'
       ?'\x1b[1;30m角色存檔：ROC網頁\\player\\ 資料夾\x1b[m\n'
-      :'\x1b[1;33m角色存檔：瀏覽器 localStorage（用「開始遊戲.cmd」開才會存進 player 資料夾）\x1b[m\n');
+      :'\x1b[1;33m角色存檔：瀏覽器 localStorage（換手機／清除瀏覽資料前請先「匯出」備份；電腦用「開始遊戲.cmd」開才會存進 player 資料夾）\x1b[m\n');
     ROC.boot(Conn);
   }catch(e){Term.write('\x1b[1;31m載入失敗：'+e+'\x1b[m\n');console.error(e);}
 })();
