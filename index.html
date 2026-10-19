@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="混沌幻世">
-<title>混沌幻世 Realm of Chaos — 本機網頁版</title>
+<title>混沌幻世 Realm of Chaos — jye 20261019 改版網頁版</title>
 <style>
   html,body{margin:0;height:100%;background:#000;color:#c0c0c0;}
   body{position:fixed;inset:0;height:var(--vh,100dvh);display:flex;flex-direction:column;font-family:"MingLiU","細明體","Noto Sans Mono CJK TC","Sarasa Mono TC",Consolas,monospace;font-size:16px;
@@ -304,7 +304,7 @@
 /* ===== 載入器 ===== */
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261020e';
+const V='20261020f';
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){
   Term.write('\x1b[1;30m載入核心資料...\x1b[m\n');

@@ -33,7 +33,8 @@ R.Desc.prototype.greet=function(){
   /* 窄螢幕（手機直向）改用精簡版標題，原圖太寬縮小後難以辨識 */
   const narrow=typeof window!=='undefined'&&window.innerWidth<600;
   const art=narrow?MOBILE_GREET:R.pick(CORE.greetings).replace(/\n+$/,'');
-  this.out('\x1b[8z'+art+'\x1b[9z\n\n');   /* 包成 ASCII 圖區塊，必要時自動縮放 */
+  this.out('\x1b[8z'+art+'\x1b[9z\n\n');
+  this.out('\x1b[1;32m【jye 20261019 改版網頁版】\x1b[0m\n\n');   /* 包成 ASCII 圖區塊，必要時自動縮放 */
   this.out('想要進入 混沌幻世 世界冒險的英雄名字是？');
 };
 
