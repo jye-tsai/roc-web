@@ -26,8 +26,13 @@
   /* 手機快捷鍵 */
   #keys{display:none;background:#111;border-top:1px solid #333;padding:4px;gap:4px;font-size:15px}
   body.touch #keys.on{display:flex}
-  #keys .dir{display:grid;grid-template-columns:repeat(3,2.6em);grid-auto-rows:2.3em;gap:3px}
-  #keys .cmds{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:2.3em;gap:3px;align-content:start}
+  #keys .dir{display:grid;grid-template-columns:repeat(3,3.3em);grid-auto-rows:3em;gap:4px}
+  #keys .dir button{font-size:18px;font-weight:bold}
+  #keys .dir button.aux{color:#aaa;font-size:15px;font-weight:normal}
+  #keys .dir button.no{opacity:.22}
+  #keys .dir button.door{color:#fa5;border-color:#a63}
+  #keys .cmds{flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:3em;gap:4px;align-content:start}
+  #keys .cmds button.ctx{color:#ff5;border-color:#664}
   #keys button{border:1px solid #333;border-radius:4px;padding:0}
   #keys .dir button{color:#5ff}
   #keys .dir .ud{color:#ff5}
@@ -154,16 +159,11 @@
 <div id="pins"></div>
 <div id="keys">
   <div class="dir">
-    <button data-c="up" class="ud">上</button><button data-c="north">北</button><button data-c="look">看</button>
-    <button data-c="west">西</button><button data-c="">↵</button><button data-c="east">東</button>
-    <button data-c="down" class="ud">下</button><button data-c="south">南</button><button data-c="scan">掃</button>
+    <button data-c="up" data-d="4" class="ud">上</button><button data-c="north" data-d="0">北</button><button data-c="scan" class="aux">掃</button>
+    <button data-c="west" data-d="3">西</button><button data-c="look" class="aux">看</button><button data-c="east" data-d="1">東</button>
+    <button data-c="down" data-d="5" class="ud">下</button><button data-c="south" data-d="2">南</button><button data-c="" class="aux">↵</button>
   </div>
-  <div class="cmds">
-    <button data-c="score">狀態</button><button data-ui="inv">物品</button><button data-ui="eq">裝備</button><button data-c="exits">出口</button>
-    <button data-ui="kill">攻擊…</button><button data-c="flee">逃跑</button><button data-ui="sk">技能</button><button data-ui="room">地上</button>
-    <button data-c="rest">休息</button><button data-c="sleep">睡覺</button><button data-c="wake">醒來</button><button data-c="stand">站起</button>
-    <button data-ui="cmd">指令…</button><button data-c="who">誰在</button><button data-c="say " data-fill>說話…</button><button data-c="save">存檔</button>
-  </div>
+  <div class="cmds"></div>
 </div>
 <div id="bar">
   <input id="cmd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" placeholder="輸入指令…" autofocus>
@@ -282,6 +282,7 @@
   keys.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.dataset.ui){UIPanel.open(b.dataset.ui);return;}
+    if(b.dataset.ctx){UIPanel.ctx(b.dataset.ctx);return;}
     if(b.dataset.c===undefined)return;
     const c=b.dataset.c;
     if(cmd.type==='password'){cmd.focus();return;}
@@ -317,7 +318,7 @@
 /* ===== 載入器 ===== */
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261020i';
+const V='20261020j';
 /* async=false：同時下載、依插入順序執行 */
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){

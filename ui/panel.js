@@ -392,7 +392,7 @@ function shopSection(ch){
 /* 參數種類：''不用 / char 房間裡的人 / npc / pc 線上玩家 / inv 身上物品 / wear 穿著的 / here 這裡的物品 / room 地上 /
    door 門或容器 / dir 方向 / text 自己打字 */
 const CMD_CAT=[
- ['移動',[['recall','回城'],['scan','掃描四周'],['exits','出口'],['follow','跟隨','char'],['follow self','停止跟隨'],['track','追蹤','text'],['hunt','獵殺','char']]],
+ ['移動',[['recall','回城'],['rest','休息'],['sleep','睡覺'],['wake','醒來'],['stand','站起'],['scan','掃描四周'],['exits','出口'],['follow','跟隨','char'],['follow self','停止跟隨'],['track','追蹤','text'],['hunt','獵殺','char']]],
  ['資訊',[['look','看四周'],['look','看人物／物品','char'],['examine','檢查物品','here'],['consider','評估對手','npc'],['score','狀態'],['affect','身上法術'],
    ['inventory','物品'],['equipment','裝備'],['who','線上玩家'],['time','時間'],['weather','天氣'],['spells','法術列表'],['slist','技能表'],
    ['areas','區域列表'],['commands','指令列表'],['socials','社交動作列表'],['help','說明','text'],['credits','製作群']]],
@@ -405,7 +405,7 @@ const CMD_CAT=[
    ['steal','偷竊','text'],['wimpy','設定逃跑血量','text']]],
  ['溝通',[['talk','和 NPC 交談','npc'],['say','說話','text'],['chat','閒聊頻道','text'],['question','新手發問','text'],['answer','老手回答','text'],['music','心情點播','text'],
    ['auction','拍賣','text'],['shout','喊叫','text'],['yell','吶喊','text'],['rumor','謠言','text'],['emote','動作','text'],['tell','密語','pc'],['reply','回覆密語','text'],['dice','擲骰子','text']]],
- ['設定',[['save','存檔'],['practice','學技能'],['config','設定一覽'],['channels','頻道設定'],['autoexit','自動顯示出口'],['autogold','自動撿錢'],['autoloot','自動撿屍體'],
+ ['設定',[['save','存檔'],['practice','學技能'],['train','訓練屬性'],['config','設定一覽'],['channels','頻道設定'],['autoexit','自動顯示出口'],['autogold','自動撿錢'],['autoloot','自動撿屍體'],
    ['combine','合併物品'],['blank','空行'],['brief','簡短描述'],['compact','精簡模式'],['prompt','提示列格式','text'],['title','稱號','text'],['password','改密碼','text'],['quit','離開遊戲','warn']]],
 ];
 const cmdOk=(ch,w)=>{const c=w.split(' ')[0];const e=R.CONST.cmds.find(x=>x[0]===c);
@@ -474,12 +474,49 @@ function renderCmds(ch){
 }
 
 /* ---- 戰鬥模式：打架時快捷鍵自動換成戰鬥用的 ---- */
-let normalKeys=null,combatSig='';
+/* ---- 平常模式：固定 4 顆，其他按鈕「遇到才出現」 ---- */
+const kwOf=v=>{const m=R.strip(R.PERS(v,me())).match(/\(([^()]+)\)\s*$/);return m?m[1]:R.lc(v.name).split(' ')[0];};
+function normalKeys(ch){
+  const bs=[['物品','@inv',''],['狀態','score',''],['技能','@sk',''],['指令…','@cmd','']];
+  if(!ch||!ch.room)return bs;
+  const P=R.POS,pos=ch.position;
+  if(pos===P.SLEEPING)bs.push(['醒來','wake','ctx']);
+  else if(pos<P.STANDING&&pos>P.SLEEPING)bs.push(['站起','stand','ctx']);
+  const npcs=ch.room.people.filter(v=>v!==ch&&v.npc&&R.canSee(ch,v));
+  for(const v of npcs){
+    if(v.shop&&!bs.some(b=>b[1]==='list'))bs.push(['商店','list','ctx']);
+    if(v.act&&v.act.has('TRAIN')&&!bs.some(b=>b[0]==='訓練'))bs.push(['訓練','@ctx:'+kwOf(v),'ctx']);
+    if(v.psk&&!bs.some(b=>b[1]==='practice'))bs.push(['學技能','practice','ctx']);
+  }
+  const talk=npcs.find(v=>R.MP&&R.MP.canTalk(v));
+  if(talk)bs.push(['交談','@ctx:'+kwOf(talk),'ctx']);
+  if(npcs.some(v=>!v.shop&&!(v.act&&v.act.has('TRAIN'))&&!v.psk))bs.push(['攻擊…','@kill','']);
+  if(ch.room.contents.some(o=>R.canSeeObj(ch,o))||(ch.room.progs||[]).some(p=>/command/.test(p.trigger)))bs.push(['地上','@room','']);   /* 地上物品或房間特殊指令 */
+  const doors=ch.room.exits.map((e,d)=>e&&e.isdoor&&e.closed?d:-1).filter(d=>d>=0);
+  for(const d of doors.slice(0,2))bs.push([(ch.room.exits[d].locked?'開鎖':'開門')+R.DIR_NAME[d],(ch.room.exits[d].locked?'unlock ':'open ')+R.DIRS[d],'ctx']);
+  if(pos>=P.STANDING&&!ch.fighting&&(ch.hit<ch.max_hit*0.5||ch.move<ch.max_move*0.3))bs.push(['休息','rest','ctx']);
+  else if(pos===P.RESTING&&ch.hit>=ch.max_hit&&ch.move>=ch.max_move&&ch.mana>=ch.max_mana)bs.push(['睡覺','sleep','']);
+  return bs.slice(0,9);
+}
+function renderDir(ch){
+  for(const b of document.querySelectorAll('#keys .dir button[data-d]')){
+    const e=ch&&ch.room&&ch.room.exits[+b.dataset.d];
+    b.classList.toggle('no',!!ch&&!!ch.room&&!e);
+    b.classList.toggle('door',!!(e&&e.closed));
+  }
+}
+const keyBtn=([l,c,cls])=>c[0]==='@'
+  ?(c.startsWith('@ctx:')?'<button data-ctx="'+esc(c.slice(5))+'" class="'+cls+'">'+esc(l)+'</button>':'<button data-ui="'+c.slice(1)+'"'+(cls?' class="'+cls+'"':'')+'>'+esc(l)+'</button>')
+  :'<button data-c="'+esc(c)+'"'+(cls?' class="'+cls+'"':'')+'>'+esc(l)+'</button>';
+let combatSig='';
 function renderCombatKeys(){
   const box=document.querySelector('#keys .cmds');if(!box)return;
-  if(normalKeys===null)normalKeys=box.innerHTML;
   const ch=me(),f=ch&&ch.fighting&&ch.fighting.room===ch.room;
-  if(!f){if(combatSig){combatSig='';box.innerHTML=normalKeys;box.classList.remove('combat');}return;}
+  renderDir(ch);
+  if(!f){
+    const bs=normalKeys(ch),sig='N'+bs.map(b=>b.join('|')).join(';');
+    if(sig!==combatSig){combatSig=sig;box.classList.remove('combat');box.innerHTML=bs.map(keyBtn).join('');}
+    return;}
   const bs=[['逃跑','flee','warn']];
   const {sp,act}=learnedList(ch);
   for(const sn of act){const s=SK()[sn],[c,mode]=SKILL_CMD[s.name];if(['fight','none'].includes(mode)&&!['hide','sneak'].includes(s.name))bs.push([s.cname,c,'']);}
@@ -492,7 +529,7 @@ function renderCombatKeys(){
   const sig=bs.map(b=>b.join('|')).join(';');
   if(sig===combatSig)return;
   combatSig=sig;box.classList.add('combat');
-  box.innerHTML=bs.map(([l,c,cls])=>c==='@sk'?'<button data-ui="sk">'+esc(l)+'</button>':'<button data-c="'+esc(c)+'"'+(cls?' class="'+cls+'"':'')+'>'+esc(l)+'</button>').join('');
+  box.innerHTML=bs.map(keyBtn).join('');
 }
 
 /* ---- 面板 ---- */
@@ -687,5 +724,5 @@ function init(){
   Term.write=function(s){w.call(Term,s);if(!q){q=true;requestAnimationFrame(()=>{q=false;renderStat();renderPins();renderChoices();renderCombatKeys();renderSheet();});}};
   setInterval(()=>{renderStat();renderPins();renderCombatKeys();},1000);
 }
-window.UIPanel={open:openSheet,close:closeSheet,init};
+window.UIPanel={open:openSheet,close:closeSheet,init,ctx:kw=>ctxMenu(kw,kw)};
 })(ROC);
