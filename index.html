@@ -92,6 +92,30 @@
   #pins button small{display:block;font-size:10px;color:#77a;line-height:1}
   #pins button.dis{opacity:.4}
   #pins button:active{background:#335}
+  /* 可點的文字 */
+  #term .lk{text-decoration:underline dotted #666;text-underline-offset:3px;cursor:pointer}
+  #term .lk:active{background:#333}
+  /* 點文字跳出的動作選單 */
+  #pop{display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);align-items:flex-end}
+  #pop.on{display:flex}
+  #pop .pp{width:100%;max-height:70%;overflow-y:auto;background:#151515;border-top:2px solid #555;padding:8px 10px calc(10px + env(safe-area-inset-bottom));box-sizing:border-box;font-size:15px}
+  #pop .pt{color:#ff5;margin:6px 0 4px}
+  #pop .pt small{color:#777;font-size:12px}
+  #pop .pa{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  #pop button{background:#2a2a2a;color:#ccc;border:1px solid #444;border-radius:4px;padding:7px 12px;font:inherit;font-size:14px;touch-action:manipulation}
+  #pop button.pri{color:#5f5;border-color:#363}#pop button.warn{color:#f77;border-color:#633}#pop button.dis{opacity:.45}
+  #pop button small{color:#77a;font-size:11px}
+  #pop .px{width:100%;margin-top:4px;color:#888}
+  #pop .hint{color:#777}
+  /* 登入選項 */
+  #choices{display:none;flex-wrap:wrap;gap:6px;padding:6px;background:#111;border-top:1px solid #333;font-size:15px;max-height:40%;overflow-y:auto}
+  #choices.on{display:flex}
+  #choices button{background:#222;color:#ddd;border:1px solid #444;border-radius:4px;padding:8px 12px;font:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  #choices button small{display:block;color:#777;font-size:11px}
+  #choices button.pri{color:#5f5;border-color:#363}
+  #choices .wide1{flex:1}
+  #choices .hint{width:100%;color:#888;font-size:13px}
+  body.touch:not(.playing) #keys.on{display:none}
   .blink{animation:bl 1s step-start infinite}@keyframes bl{50%{opacity:0}}
 </style>
 </head>
@@ -102,6 +126,8 @@
   <div class="tabs"><button data-tab="inv">物品</button><button data-tab="eq">裝備</button><button data-tab="room">地上</button><button data-tab="sk">技能</button><button class="x" data-close>✕</button></div>
   <div class="body"></div>
 </div>
+<div id="pop"><div class="pp"><div class="pb"></div><button class="px" data-x>關閉</button></div></div>
+<div id="choices"></div>
 <div id="pins"></div>
 <div id="keys">
   <div class="dir">
@@ -139,7 +165,8 @@
     if(!t) return '';
     const c=[];
     if(st.b)c.push('b'); if(st.fg!==37||st.b)c.push('c'+st.fg); if(st.bg!==40)c.push('g'+st.bg); if(st.bl)c.push('blink');
-    return c.length?'<span class="'+c.join(' ')+'">'+esc(t)+'</span>':esc(t);
+    const h=Term.linkify?Term.linkify(esc(t)):esc(t);
+    return c.length?'<span class="'+c.join(' ')+'">'+h+'</span>':h;
   }
   function sgr(p){
     const a=p===''?[0]:p.split(';').map(Number);
@@ -203,7 +230,7 @@
     b.addEventListener('pointerdown',e=>{if(b.id!=='bSend'||document.activeElement!==cmd)e.preventDefault();});
   document.getElementById('bSend').onclick=()=>{const v=cmd.value;cmd.value='';submit(v,true);if(!touch)cmd.focus();};
   const keys=document.getElementById('keys');
-  window.UI={send:c=>submit(c,c===''),fill:c=>{cmd.value=c;cmd.focus();}};
+  window.UI={send:c=>submit(c,c===''),raw:c=>submit(c,false),fill:c=>{cmd.value=c;cmd.focus();}};
   for(const b of keys.querySelectorAll('button[data-ui]'))b.onclick=()=>UIPanel.open(b.dataset.ui);
   document.getElementById('bBag').onclick=()=>UIPanel.open('inv');
   for(const b of keys.querySelectorAll('button[data-c]'))b.onclick=()=>{
@@ -240,14 +267,16 @@
 
 /* ===== 載入器 ===== */
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
+/* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
+const V='20261019c';
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){
   Term.write('\x1b[1;30m載入核心資料...\x1b[m\n');
   try{
     await loadScript('data/core.js'); await loadScript('data/const.js'); await loadScript('data/skills.js'); await loadScript('data/index.js');
     for(const f of ['util','db','handler','act','save','info','move','obj','comm','fight','magic','spells_attack','spells_aid','spells_assist','spells_cure_obj','skill','skills_cmd','wiz','update','sim','interp','owner','nanny'])
-      await loadScript('engine/'+f+'.js');
-    await loadScript('ui/panel.js');UIPanel.init();
+      await loadScript('engine/'+f+'.js?v='+V);
+    await loadScript('ui/panel.js?v='+V);UIPanel.init();
     const n=ROC.AREAS.length;let k=0;
     const bar=document.createElement('div');bar.style.color='#555';document.getElementById('term').appendChild(bar);
     const B=8;

@@ -163,7 +163,7 @@ R.logout=function(ch){
 R.boot=function(conn){
   R.bootDb();
   R.startUpdate();
-  const d=new R.Desc(conn);
+  const d=new R.Desc(conn);conn.desc=d;
   conn.onInput(async line=>{
     try{
       await d.input(line);

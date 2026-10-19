@@ -160,6 +160,114 @@ function renderPins(force){
   lastPins=h;el.innerHTML=h;el.classList.toggle('on',!!h);
 }
 
+/* ---- 畫面文字可以點：名字(keyword)、look xxx、出口方向 ---- */
+const DIRW='north|south|east|west|up|down';
+function linkify(t){
+  if(!/[A-Za-z]/.test(t))return t;
+  /* 只有方向字的片段（[出口: south up] 的彩色部分） */
+  if(new RegExp('^\\s*('+DIRW+')(\\s+('+DIRW+'))*\\s*$','i').test(t))
+    return t.replace(new RegExp('\\b('+DIRW+')\\b','gi'),'<u class="lk" data-cmd="$1">$1</u>');
+  /* exits 列表：North  - 某某地方 */
+  t=t.replace(/^(North|South|East|West|Up|Down)(?=\s+-)/gm,m=>'<u class="lk" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
+  /* 文字裡的指令提示：look sign / help newbie */
+  t=t.replace(/\b((?:look|help) [A-Za-z][A-Za-z']*)/g,'<u class="lk" data-cmd="$1">$1</u>');
+  /* 中文名(english keyword) */
+  t=t.replace(/([^\s()<>\[\]，。、：:；;「」]{0,8})\(([A-Za-z][A-Za-z0-9'\- ]{0,40})\)/g,
+    (m,pre,kw)=>'<u class="lk" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>');
+  return t;
+}
+/* look 指令找物品的順序（身上→地上，含額外描述），用來算 N.關鍵字 */
+function lookFind(ch,arg){
+  const [n,name]=R.num_arg(arg);let c=0;
+  for(const o of [...ch.carrying,...ch.room.contents]){
+    for(const e of o.extra_descr)if(R.is_name(name,e.keywords)&&++c===n)return null;
+    if(R.is_name(name,o.name)&&++c===n)return o;
+  }
+  return null;
+}
+const refLook=(ch,o)=>ref(o,a=>lookFind(ch,a));
+function ctxMenu(kw,label){
+  const ch=me();
+  const pop=$('pop'),k=R.lc(kw.trim()),tag='('+k+')';
+  const has=s=>R.lc(R.strip(s||'')).includes(tag);
+  let h='';
+  if(!ch||!ch.room){
+    h='<div class="hint">'+esc(label)+'</div>'+btn('說明 help '+esc(k.split(' ')[0]),'help '+k.split(' ')[0]);
+  }else{
+    const f=ch.fighting&&ch.fighting.room===ch.room?ch.fighting:null;
+    /* 人物／怪物 */
+    for(const v of ch.room.people.filter(v=>R.canSee(ch,v)&&(has(R.PERS(v,ch))||(!v.npc&&R.lc(v.name)===k)))){
+      const r=v===ch?'self':refChar(ch,v);if(!r)continue;
+      h+='<div class="pt">'+esc(R.strip(R.PERS(v,ch)))+(v.npc?' <small>Lv'+v.level+'</small>':'')+'</div><div class="pa">'+btn('看','look '+r);
+      if(v!==ch){
+        if(v.npc)h+=btn('評估','consider '+r);
+        if(v.npc&&v!==f)h+=btn('攻擊','kill '+r,'warn');
+        if(v.shop)h+=btn('商品','list','pri');
+        if(v.psk)h+=btn('學技能','practice','pri');
+        if(!v.npc)h+=btn('跟隨','follow '+r);
+        const {sp,act}=learnedList(ch);
+        for(const sn of [...sp,...act]){
+          const s=SK()[sn],isSp=!!s.fun;
+          if(isSp&&![1,2].includes(s.tar))continue;
+          if(!isSp&&!['fight','char'].includes(SKILL_CMD[s.name][1]))continue;
+          if(isSp&&s.tar===1&&!v.npc)continue;
+          const c=isSp?castCmd(sn,v===f?'':r):SKILL_CMD[s.name][0]+(v===f&&SKILL_CMD[s.name][1]==='fight'?'':' '+r);
+          h+=btn(esc(s.cname)+(isSp?'<small> '+s.mana+'</small>':''),c,isSp&&ch.mana<s.mana?'dis':'');
+        }
+      }
+      h+='</div>';
+    }
+    /* 物品：地上、身上、裝備 */
+    const objs=[...ch.room.contents,...ch.carrying].filter(o=>has(o.short));
+    const seen=new Set();
+    for(const o of objs){
+      const where=o.carried_by===ch||ch.carrying.includes(o)?(o.wear_loc>=0?'eq':'inv'):'room';
+      if(seen.has(where+keyOf(o)))continue;seen.add(where+keyOf(o));
+      const rl=refLook(ch,o);
+      h+='<div class="pt">'+esc(nm(o))+' <small>'+({room:'地上',inv:'身上',eq:'裝備中'})[where]+'</small></div><div class="pa">'+(rl?btn('看','look '+rl):'');
+      if(where==='room'){const r=refRoom(ch,o);
+        if(r&&o.wear.has('TAKE'))h+=btn('撿起','get '+r,'pri');
+        if(r&&/CONTAINER|CORPSE/.test(o.type)&&o.contains.length)h+=btn('拿光裡面','get all '+r,'pri');
+        if(o.type==='FOUNTAIN')h+=btn('喝水','drink '+(refHere(ch,o)||''),'pri');}
+      else h+='<button data-open="'+where+'|'+esc(keyOf(o)+(where==='eq'?'@'+o.wear_loc:''))+'">更多動作…</button>';
+      h+='</div>';
+    }
+    /* 其他（房間的額外描述、看不到的東西） */
+    if(!h){const w=k.split(/\s+/)[0];h='<div class="pt">'+esc(label)+'</div><div class="pa">'+btn('看','look '+w)+btn('說明','help '+w)+'</div>';}
+  }
+  pop.querySelector('.pb').innerHTML=h;
+  pop.classList.add('on');
+}
+function closePop(){$('pop').classList.remove('on');}
+
+/* ---- 登入／建角：把要輸入的選項變成按鈕 ---- */
+let lastCh='';
+function renderChoices(){
+  const el=$('choices'),d=window.Conn&&Conn.desc;
+  const st=d?d.state:'';
+  let h='';
+  const yn='<button data-raw="y" class="pri">是 (Y)</button><button data-raw="n">否 (N)</button>';
+  switch(st){
+    case 'GET_NAME':{
+      const names=Object.values(R.Store.all()).map(x=>x&&x.name).filter(Boolean).sort();
+      if(names.length)h='<span class="hint">選擇角色，或在下方輸入新名字：</span>'+names.map(n=>'<button data-raw="'+esc(n)+'" class="pri">'+esc(n)+'</button>').join('');
+      else h='<span class="hint">在下方輸入英文名字（3~12 個字母）建立新角色</span>';
+      break;}
+    case 'GET_OLD_PASSWORD':case 'OWNER_PASSWORD':case 'GET_NEW_PASSWORD':case 'CONFIRM_NEW_PASSWORD':
+      h='<span class="hint">在下方輸入密碼（至少 5 個字）</span>';break;
+    case 'CONFIRM_NEW_NAME':case 'CONFIRM_NEW_RACE':case 'CONFIRM_CLASS':h=yn;break;
+    case 'DISPLAY_RACE':case 'DISPLAY_CLASS':case 'READ_MOTD':h='<button data-raw="" class="pri wide1">繼續 ▶</button>';break;
+    case 'GET_NEW_RACE':
+      h=R.CONST.races.filter(r=>r.abil&1).map(r=>'<button data-raw="'+esc(r.name)+'">'+esc(r.cname)+'<small>'+esc(r.name)+'</small></button>').join('');break;
+    case 'GET_NEW_SEX':h='<button data-raw="m">男性</button><button data-raw="f">女性</button><button data-raw="n">中性</button>';break;
+    case 'GET_NEW_CLASS':
+      h=R.CONST.classes.slice(0,5).map(c=>'<button data-raw="'+esc(c.who)+'">'+esc(c.cname)+'<small>'+esc(c.who)+'</small></button>').join('');break;
+  }
+  document.body.classList.toggle('playing',st==='PLAYING');
+  if(h===lastCh)return;
+  lastCh=h;el.innerHTML=h;el.classList.toggle('on',!!h);
+}
+
 /* ---- 面板 ---- */
 let tab='inv',openKey=null,giveFor=null,putFor=null;
 const keyOf=o=>o.vnum+'|'+o.short;
@@ -300,6 +408,7 @@ function init(){
     if(b.dataset.give){giveFor=b.dataset.give;renderSheet();return;}
     if(b.dataset.put){putFor=b.dataset.put;renderSheet();return;}
     if(b.dataset.into){putFor='into:'+b.dataset.into;renderSheet();return;}
+    if(b.dataset.open){const [w,k]=b.dataset.open.split('|');tab=w;openKey=k;giveFor=putFor=null;renderSheet();return;}
     if(b.dataset.recite){putFor='recite:'+b.dataset.recite;renderSheet();return;}
     if(b.dataset.pin){const ch=me();if(ch){const [k,n]=b.dataset.pin.split('|');togglePin(ch,k,n,n);renderSheet();}return;}
     if(b.dataset.pini){const ch=me();if(ch){const v=+b.dataset.pini,o=ch.carrying.find(x=>x.vnum===v);
@@ -310,13 +419,31 @@ function init(){
     if(b.dataset.c){giveFor=putFor=null;send(b.dataset.c);}
   });
   sh.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
+  const pop=$('pop');
+  pop.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
+  pop.addEventListener('click',e=>{
+    if(e.target===pop||e.target.closest('[data-x]')){closePop();return;}
+    const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.open){const [w,k]=b.dataset.open.split('|');closePop();openSheet(w);openKey=k;renderSheet();return;}
+    if(b.dataset.c!==undefined){closePop();send(b.dataset.c);}
+  });
+  $('term').addEventListener('click',e=>{
+    const u=e.target.closest('.lk');if(!u)return;
+    e.stopPropagation();
+    if(u.dataset.cmd){send(u.dataset.cmd);return;}
+    if(u.dataset.kw)ctxMenu(u.dataset.kw,u.textContent);
+  });
+  const chs=$('choices');
+  chs.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
+  chs.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.dataset.raw!==undefined)window.UI.raw(b.dataset.raw);});
+  Term.linkify=linkify;
   const pe=$('pins');
   pe.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
   pe.addEventListener('click',e=>{const b=e.target.closest('button');const ch=me();if(!b||!ch)return;const p=getPins(ch)[+b.dataset.i];if(p)runPin(ch,p);});
   /* 有新輸出時更新（同一個畫格只算一次） */
   let q=false;
   const w=Term.write;
-  Term.write=function(s){w.call(Term,s);if(!q){q=true;requestAnimationFrame(()=>{q=false;renderStat();renderPins();renderSheet();});}};
+  Term.write=function(s){w.call(Term,s);if(!q){q=true;requestAnimationFrame(()=>{q=false;renderStat();renderPins();renderChoices();renderSheet();});}};
   setInterval(()=>{renderStat();renderPins();},1000);
 }
 window.UIPanel={open:openSheet,close:closeSheet,init};
