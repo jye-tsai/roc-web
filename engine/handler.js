@@ -21,6 +21,7 @@ R.objToObj=(o,c)=>{R.objFrom(o);c.contains.unshift(o);o.in_obj=c;};
 R.extractObj=o=>{R.objFrom(o);for(const c of [...o.contains])R.extractObj(c);rm(W.objects,o);o.proto.count--;o.deleted=true;};
 R.extractChar=(ch,fPull)=>{
   R.stopFighting(ch,true);
+  if(ch.group&&R.removeMember)R.removeMember(ch);
   for(const o of [...ch.carrying])R.extractObj(o);
   R.charFromRoom(ch);
   if(ch.npc){rm(W.chars,ch);ch.proto.count--;ch.deleted=true;}

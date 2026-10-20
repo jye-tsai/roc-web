@@ -45,7 +45,7 @@ const objCarry=(ch,arg)=>{if(!ch)return null;if(isNum(arg)){const v=+arg;return 
 const objWear=(ch,arg)=>{if(!ch)return null;if(isNum(arg)){const v=+arg;return ch.carrying.find(o=>o.wear_loc>=0&&o.vnum===v)||null;}
   const [n,nm]=numArg(arg);let c=0;for(const o of ch.carrying)if(o.wear_loc>=0&&nameHit(nm,o.name,true)&&++c===n)return o;return null;};
 const objHere=(ch,arg)=>ch&&ch.room?(findIn(ch.room.contents,arg)||objCarry(ch,arg)||objWear(ch,arg)):null;
-const sameGroup=(a,b)=>{const la=a.leader||a.master||a,lb=b.leader||b.master||b;return la===lb;};
+const sameGroup=(a,b)=>R.isSameGroup(a,b);
 const isImmort=x=>!x.npc&&R.isImm(x);
 
 /* ---------- 情境 ---------- */
@@ -229,7 +229,7 @@ const CHARNUM={
 const CHARBOOL={
   ispc:x=>!x.npc,isnpc:x=>x.npc,isgood:x=>R.isGood(x),isevil:x=>R.isEvil(x),isneutral:x=>R.isNeutral(x),isfight:x=>!!x.fighting,
   is_fight:x=>!!x.fighting,isdrunk:x=>false,isfly:x=>x.aff.has('FLYING'),isimmort:x=>isImmort(x),ischarmed:x=>x.aff.has('CHARM'),
-  isfollow:x=>!!x.master&&x.master.room===x.room,isgroup:x=>!!(x.leader||x.master),ishorse:x=>false,
+  isfollow:x=>!!x.master&&x.master.room===x.room,isgroup:x=>!!x.group,ishorse:x=>false,
 };
 function ifcheck(expr,c){
   const p=parseIf(expr);if(!p){warn('if:'+expr,'看不懂的條件：'+expr);return false;}
@@ -315,7 +315,7 @@ function evalIf(fn,arg,op,val,c){
       return who.fighting?seval(who.fighting.name,op,val):false;
     }
     case 'followwith':{const x=ifChar(arg,c);return x&&x.master?seval(x.master.name,op,val):false;}
-    case 'groupwith':{const x=ifChar(arg,c);const l=x&&(x.leader||x.master);return l?seval(l.name,op,val):false;}
+    case 'groupwith':{const x=ifChar(arg,c);const l=x&&x.group&&x.group.leader;return l?seval(l.name,op,val):false;}
     case 'skillexp':case 'learned':{
       const x=ifChar(arg,c);if(x===undefined)return undefined;
       const sn=atoi(vt[0]),want=atoi(vt[1]);

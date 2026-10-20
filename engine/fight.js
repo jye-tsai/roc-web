@@ -186,6 +186,8 @@ function rawKill(ch,v){
     if(!ch.npc&&corpse){
       if(ch.act.has('AUTOGOLD')){const g=corpse.contains.find(o=>o.type==='MONEY');if(g)R.getObj(ch,g,corpse);}
       if(ch.act.has('AUTOLOOT'))for(const o of [...corpse.contains])R.getObj(ch,o,corpse);
+      else if(corpse.contains.length)R.cmds.look(ch,'in corpse');
+      if(ch.act.has('AUTOSAC')&&corpse.in_room===room)R.cmds.sacrifice(ch,'corpse');   /* fight_damage.c：autoloot 後 autosac */
     }
     return;
   }
@@ -209,7 +211,7 @@ function xpCompute(ch,v){
   return R.fuzzy(xp);   /* 簡化：原版 xp_compute 未完整移植 */
 }
 function groupGain(ch,v){
-  const members=ch.room.people.filter(p=>!p.npc&&(p===ch||p.master===ch||ch.master===p||p.master&&p.master===ch.master));
+  const members=ch.room.people.filter(p=>!p.npc&&R.isSameGroup(p,ch));   /* group_gain：同房間的隊友 */
   for(const p of members){
     let xp=Math.floor(xpCompute(p,v)/members.length)||1;
     R.send(p,'你得到 '+C.HIG+xp+C.NOR+' 點經驗.\n');

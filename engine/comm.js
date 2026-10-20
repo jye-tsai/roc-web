@@ -126,7 +126,7 @@ cmd.title=function(ch,a){
   a=(a||'').trim();if(!a){R.send(ch,'要改成什麼稱號？\n');return;}
   ch.pc.title=(a[0]==='-'||a[0]===','?'':'- ')+a.slice(0,40);R.send(ch,'好的。\n');
 };
-const TOG={autoexit:'AUTOEXIT',autogold:'AUTOGOLD',autoloot:'AUTOLOOT',combine:'COMBINE',blank:'BLANK',brief:'BRIEF',compact:'COMPACT'};
+const TOG={autoexit:'AUTOEXIT',autogold:'AUTOGOLD',autoloot:'AUTOLOOT',autosac:'AUTOSAC',combine:'COMBINE',blank:'BLANK',brief:'BRIEF',compact:'COMPACT'};
 Object.entries(TOG).forEach(([n,f])=>{cmd[n]=ch=>{if(ch.act.has(f)){ch.act.delete(f);R.send(ch,n+' 關閉。\n');}else{ch.act.add(f);R.send(ch,n+' 開啟。\n');}};});
 cmd.config=function(ch){
   let s='[ 設定 ]\n';

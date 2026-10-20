@@ -66,7 +66,8 @@ function showChar1(v,ch){
   const r=R.CONST.races[v.race]||{cname:'?',name:'?'};
   let s=R.PERS(v,ch)+' - '+r.cname+'('+r.name+'):\n';
   /* 玩家的 desc 是連線物件，不是描述文字 */
-  s+=typeof v.desc==='string'&&v.desc?v.desc.replace(/\n+$/,'')+'\n':['它','他','她'][v.sex]+'看起來沒有什麼特色。\n';
+  const ds=v.npc?v.desc:v.pc&&v.pc.description;
+  s+=typeof ds==='string'&&ds?ds.replace(/\n+$/,'')+'\n':['它','他','她'][v.sex]+'看起來沒有什麼特色。\n';
   s+=R.healthLine(v,ch)+'\n';
   const eq=R.EQ_ORDER.map(l=>R.getEq(v,l)).filter(Boolean);
   if(eq.length){s+='\n'+['它','他','她'][v.sex]+'身上穿著：\n';for(const o of eq)s+=R.WHERE_NAME[o.wear_loc]+fmtObj(o,ch,true)+'\n';}

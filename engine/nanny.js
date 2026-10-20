@@ -179,6 +179,7 @@ function enterGame(d){
 
 R.logout=function(ch){
   ch.playing=false;
+  if(ch.group&&R.removeMember)R.removeMember(ch);
   R.stopFighting(ch,true);
   for(const o of [...ch.carrying])R.extractObj(o);
   if(ch.room)R.charFromRoom(ch);

@@ -249,6 +249,13 @@ function ctxMenu(kw,label){
           +[['str','力量'],['int','智能'],['wis','智慧'],['dex','敏捷'],['con','體質'],['hp','生命'],['mana','魔法'],['move','移動'],['practice','練習點']].map(([a,n])=>btn(n,'train '+a)).join('')
           +[['hp-r','生命'],['mana-r','魔法'],['move-r','移動'],['practice-r','練習點']].map(([a,n])=>btn('盡量'+n,'train '+a)).join('');
         if(!v.npc)h+=btn('跟隨','follow '+r);
+        if(v.master===ch&&!v.group)h+=btn('收入隊伍',ch.group?'group + '+r:'group form','pri');
+        if(v.group&&ch.group===v.group&&ch.group.leader===ch)h+=btn('移出隊伍','group - '+r);
+        if(v.npc&&v.act&&v.act.has('BANKER'))h+='</div><div class="pt">銀行 <small>身上 '+ch.gold+'・存款 '+ch.bank+'</small></div><div class="pa">'
+          +(ch.gold>0?btn('全部存入','deposit '+ch.gold,'pri'):'')+(ch.bank>0?btn('全部領出','withdraw '+ch.bank,'pri'):'')
+          +[1000,10000,100000].filter(n=>n<=ch.gold).map(n=>btn('存 '+n,'deposit '+n)).join('')
+          +[1000,10000,100000].filter(n=>n<=ch.bank).map(n=>btn('領 '+n,'withdraw '+n)).join('')
+          +btnFill('存…','deposit ')+btnFill('領…','withdraw ');
         const {sp,act}=learnedList(ch);
         for(const sn of [...sp,...act]){
           const s=SK()[sn],isSp=!!s.fun;
@@ -393,7 +400,7 @@ function shopSection(ch){
    door 門或容器 / dir 方向 / text 自己打字 */
 const CMD_CAT=[
  ['移動',[['recall','回城'],['rest','休息'],['sleep','睡覺'],['wake','醒來'],['stand','站起'],['scan','掃描四周'],['exits','出口'],['follow','跟隨','char'],['follow self','停止跟隨'],['track','追蹤','text'],['hunt','獵殺','char']]],
- ['資訊',[['look','看四周'],['look','看人物／物品','char'],['examine','檢查物品','here'],['consider','評估對手','npc'],['score','狀態'],['affect','身上法術'],
+ ['資訊',[['look','看四周'],['look','看人物／物品','char'],['examine','檢查物品','here'],['consider','評估對手','npc'],['compare','比較物品','inv'],['where','附近有誰'],['whois','查詢玩家','pc'],['deposit','存錢','text'],['withdraw','領錢','text'],['score','狀態'],['affect','身上法術'],
    ['inventory','物品'],['equipment','裝備'],['who','線上玩家'],['time','時間'],['weather','天氣'],['spells','法術列表'],['slist','技能表'],
    ['areas','區域列表'],['commands','指令列表'],['socials','社交動作列表'],['help','說明','text'],['credits','製作群']]],
  ['物品',[['get all','撿全部'],['get','撿起','room'],['drop','丟掉','inv'],['give','給…','inv'],['wear all','全部穿上'],['wear','穿上','inv'],['remove','脫下','wear'],
@@ -403,9 +410,11 @@ const CMD_CAT=[
  ['戰鬥',[['kill','攻擊','npc'],['murder','攻擊玩家','char'],['flee','逃跑'],['rescue','解救','char'],['backstab','背刺','npc'],['kick','飛腿'],['bashhead','頭部猛擊'],
    ['disarm','擊落武器'],['berserk','全力猛攻'],['frenzy','狂暴攻擊'],['bashdoor','撞門','dir'],['hide','藏匿'],['sneak','潛行'],['peek','窺視','char'],
    ['steal','偷竊','text'],['wimpy','設定逃跑血量','text']]],
+ ['組隊',[['group','隊伍狀態'],['group form','成立隊伍'],['group all','收所有跟隨者'],['group +','收入隊伍','char'],['group -','移出隊伍','char'],
+   ['group transfer','交接隊長','char'],['group leave','離開隊伍'],['group disband','解散隊伍'],['gtell','隊伍頻道','text'],['split','分錢','text'],['report','報告狀態'],['follow','跟隨','char'],['follow self','停止跟隨']]],
  ['溝通',[['talk','和 NPC 交談','npc'],['say','說話','text'],['chat','閒聊頻道','text'],['question','新手發問','text'],['answer','老手回答','text'],['music','心情點播','text'],
    ['auction','拍賣','text'],['shout','喊叫','text'],['yell','吶喊','text'],['rumor','謠言','text'],['emote','動作','text'],['tell','密語','pc'],['reply','回覆密語','text'],['dice','擲骰子','text']]],
- ['設定',[['save','存檔'],['practice','學技能'],['train','訓練屬性'],['config','設定一覽'],['channels','頻道設定'],['autoexit','自動顯示出口'],['autogold','自動撿錢'],['autoloot','自動撿屍體'],
+ ['設定',[['save','存檔'],['practice','學技能'],['train','訓練屬性'],['afk','暫時離開'],['autosac','自動獻祭屍體'],['description','角色描述','text'],['bug','回報錯誤','text'],['idea','提供建議','text'],['config','設定一覽'],['channels','頻道設定'],['autoexit','自動顯示出口'],['autogold','自動撿錢'],['autoloot','自動撿屍體'],
    ['combine','合併物品'],['blank','空行'],['brief','簡短描述'],['compact','精簡模式'],['prompt','提示列格式','text'],['title','稱號','text'],['password','改密碼','text'],['quit','離開遊戲','warn']]],
 ];
 const cmdOk=(ch,w)=>{const c=w.split(' ')[0];const e=R.CONST.cmds.find(x=>x[0]===c);
@@ -489,6 +498,7 @@ function normalKeys(ch){
     if(v.shop&&!bs.some(b=>b[1]==='list'))bs.push(['商店','list','ctx']);
     if(v.act&&v.act.has('TRAIN')&&!bs.some(b=>b[0]==='訓練'))bs.push(['訓練','@ctx:'+kwOf(v),'ctx']);
     if(v.psk&&!bs.some(b=>b[1]==='practice'))bs.push(['學技能','practice','ctx']);
+    if(v.act&&v.act.has('BANKER')&&!bs.some(b=>b[0]==='銀行'))bs.push(['銀行','@ctx:'+kwOf(v),'ctx']);
   }
   const talk=npcs.find(v=>R.MP&&R.MP.canTalk(v));
   if(talk)bs.push(['交談','@ctx:'+kwOf(talk),'ctx']);
@@ -545,7 +555,8 @@ function invActions(ch,o){
   let a='';
   if(o.type==='LIGHT'||slotOf(o))a+=btn(o.wear.has('WIELD')||o.wear.has('TWO_HAND')?'裝備':o.wear.has('HOLD')?'握住':'穿上','wear '+r,'pri');
   if(/FOOD|PILL/.test(o.type))a+=btn('吃','eat '+r,'pri');
-  if(o.type==='DRINK_CON'){const rh=refHere(ch,o);if(rh)a+=btn('喝','drink '+rh,'pri');}
+  if(o.type==='DRINK_CON'){const rh=refHere(ch,o);if(rh)a+=btn('喝','drink '+rh,'pri');if(ch.room.contents.some(x=>x.type==='FOUNTAIN'))a+=btn('裝水','fill '+r);}
+  if(/ARMOR|WEAPON/.test(o.type)&&ch.carrying.some(x=>x.wear_loc>=0&&x.type===o.type))a+=btn('和身上的比較','compare '+r);
   if(o.type==='POTION')a+=btn('喝下','quaff '+r,'pri');
   if(o.type==='SCROLL'){a+=btn('念（自己）','recite '+r,'pri')+'<button data-recite="'+esc(keyOf(o))+'">對…念</button>';}
   if(ITEM_USE[o.type]){const pinned=getPins(ch).some(p=>p.k==='i'&&p.v===o.vnum);a+='<button data-pini="'+o.vnum+'" class="pin">'+(pinned?'★ 取消釘選':'☆ 釘到快捷列')+'</button>';}

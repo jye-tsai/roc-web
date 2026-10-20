@@ -4,7 +4,7 @@ const P=R.POS,cmd=R.cmds;
 const POSMSG={0:'靜靜躺著吧，你已經死了.',1:'你的狀況太糟了.',2:'你的狀況太糟了.',3:'你頭昏眼花.',5:'你麻痺了.',
   4:'你正在睡夢中，請先 wake 起來。',6:"啊...你覺得有點懶散...(你必須先'站'起來)",7:'不行！  你還在戰鬥中！'};
 const ALIAS={l:'look',i:'inventory',eq:'equipment',sc:'score',k:'kill',n:'north',e:'east',s:'south',w:'west',u:'up',d:'down',
-  "'":'say','.':'chat',',':'emote','sac':'sacrifice'};
+  "'":'say','.':'chat',';':'gtell',',':'emote','sac':'sacrifice'};
 const LV={L_HER:R.LEVEL_HERO,L_APP:R.L_APP};
 const lvOf=v=>typeof v==='number'?v:(LV[v]??99);
 /* 原版指令名稱 → JS 實作名稱 */
