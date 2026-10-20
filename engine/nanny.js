@@ -169,6 +169,8 @@ function enterGame(d){
   }else room=R.getRoom(ch.savedRoom)||R.getRoom(R.ROOM_TEMPLE);
   if(!ch.pc.prompt)ch.pc.prompt=DEF_PROMPT;
   ch.logon=Date.now();ch.playing=true;
+  /* 清掉清單裡殘留的同名舊物件，再加入 */
+  for(const p of [...W.players])if(p!==ch&&R.lc(p.name)===R.lc(ch.name)){p.playing=false;if(p.room)R.charFromRoom(p);W.players.splice(W.players.indexOf(p),1);}
   W.players.push(ch);
   R.charToRoom(ch,room);
   R.act('$n 連線進入這個世界.',ch,null,null,R.TO_ROOM);

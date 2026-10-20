@@ -2,7 +2,8 @@
 (function(R){
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const me=()=>R.world&&R.world.players.find(p=>p.playing&&p.conn===window.Conn&&!p.deleted);
+/* 目前這個連線登入的角色（以 Conn.desc.ch 為準，避免清單裡殘留同名舊物件） */
+const me=()=>{const d=window.Conn&&Conn.desc,c=d&&d.ch;return c&&c.playing&&!c.deleted?c:null;};
 const send=c=>window.UI.send(c);
 
 /* ---- 指令參數：找出能讓引擎選到「這一件」的 N.關鍵字 ---- */
@@ -45,6 +46,10 @@ function renderStat(){
   h+='<div class="si">'+(f&&f.room===ch.room
     ?'<b>⚔ '+esc(R.strip(R.PERS(f,ch)))+'</b> '+(f.max_hit>0?Math.max(0,Math.round(f.hit/f.max_hit*100)):0)+'%'
     :'Lv'+ch.level+' · 金 '+ch.gold)+'</div>';
+  /* 身上的法術效果（同一法術只列一次，取最長時間）；點了看 affect */
+  const af={};for(const a of ch.affects||[])if(!a.deleted&&SK()[a.type]){const k=a.type;af[k]=Math.max(af[k]??-1,a.duration);}
+  const ks=Object.keys(af);
+  if(ks.length)h+='<div class="afs" data-c="affect">'+ks.map(k=>'<span>'+esc(SK()[k].cname)+(af[k]>=0?'<small>'+af[k]+'</small>':'')+'</span>').join('')+'</div>';
   if(h!==lastStat){el.innerHTML=h;el.classList.add('on');el.classList.toggle('fight',!!(f&&f.room===ch.room));lastStat=h;}
 }
 
@@ -756,6 +761,7 @@ function init(){
     if(u.dataset.cmd){send(u.dataset.cmd);return;}
     if(u.dataset.kw)ctxMenu(u.dataset.kw,u.textContent);
   });
+  $('stat').addEventListener('click',e=>{if(e.target.closest('.afs'))send('affect');});
   const chs=$('choices');
   chs.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
   chs.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;

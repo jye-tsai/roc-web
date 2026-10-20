@@ -47,7 +47,7 @@
   .b.c30{color:#555}.b.c31{color:#f55}.b.c32{color:#5f5}.b.c33{color:#ff5}.b.c34{color:#55f}.b.c35{color:#f5f}.b.c36{color:#5ff}.b.c37{color:#fff}
   .g40{background:#000}.g41{background:#a00}.g42{background:#0a0}.g43{background:#a50}.g44{background:#00a}.g45{background:#a0a}.g46{background:#0aa}.g47{background:#aaa}
   /* 狀態血條 */
-  #stat{display:none;gap:4px;padding:4px 6px;background:#0a0a0a;border-bottom:1px solid #333;font-size:12px;align-items:center}
+  #stat{display:none;flex-wrap:wrap;gap:4px;padding:4px 6px;background:#0a0a0a;border-bottom:1px solid #333;font-size:12px;align-items:center}
   #stat.on{display:flex}
   .sb{flex:1;position:relative;height:18px;background:#222;border-radius:3px;overflow:hidden;min-width:0}
   .sb i{position:absolute;inset:0 auto 0 0;transition:width .3s}
@@ -56,6 +56,9 @@
   .si{flex:0 1 auto;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34%}
   .si b{color:#f55}
   .sb .lb{font-weight:normal}
+  #stat .afs{flex:0 0 100%;display:flex;gap:4px;overflow-x:auto;white-space:nowrap;cursor:pointer}
+  #stat .afs span{background:#1d2a1d;color:#8f8;border:1px solid #363;border-radius:3px;padding:0 5px;font-size:11px;line-height:16px}
+  #stat .afs small{color:#6a6;margin-left:3px}
   @media (max-width:500px){#stat.fight .sb .lb{display:none}}
   /* 物品／裝備面板 */
   #sheet{display:none;flex-direction:column;max-height:58%;background:#111;border-top:2px solid #444;font-size:15px}
@@ -328,7 +331,7 @@
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
 Term.measure();
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261020o';
+const V='20261020p';
 /* async=false：同時下載、依插入順序執行 */
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){

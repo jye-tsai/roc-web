@@ -344,6 +344,11 @@ cmd.affect=cmd.affects=function(ch){
   let s='你受到以下法術的影響:\n';
   for(const a of list){
     const k=SK[a.type];
+    if(R.narrow()){   /* 手機：名稱一行、效果縮排一行 */
+      s+='法術: '+C.HIC+(k?k.cname+'('+k.name+')':'?')+C.NOR+'\n';
+      if(ch.level>=10)s+='      '+(a.location!=='NONE'?'影響'+(LOCNAME[a.location]||a.location)+' '+(a.modifier>=0?'+':'')+a.modifier+' ':'')+(a.duration<0?'永久':'剩 '+a.duration+' 小時')+'\n';
+      continue;
+    }
     s+='法術: '+C.HIC+R.pad((k?k.cname+'('+k.name+')':'?'),30)+C.NOR;
     if(ch.level>=10){
       if(a.location!=='NONE')s+=' 影響'+(LOCNAME[a.location]||a.location)+' '+(a.modifier>=0?'+':'')+a.modifier;
