@@ -252,7 +252,8 @@ function immList(ch){
   /* 快捷 */
   return '<div class="pa pad0">'+[['完全恢復','restore self'],['停止戰鬥','peace'],['全知視野','holylight'],['隱身','invis'],['清空房間','purge'],
     ['房間資訊','rstat'],['我的資料','mstat self'],['線上名單','users'],['站長指令表','wizhelp'],['回城','recall'],['查全站最強裝備','bestgear list'],['自動穿上最強裝備','bestgear'],['查最強（含神器）','bestgear list all'],['穿上最強（含神器）','bestgear all']].map(([l,c])=>btn(l,c)).join('')
-    +btnFill('對全區廣播…','echo ')+btnFill('改等級（advance）…','advance self ')+btnFill('強制指令（force）…','force ')+'</div>';
+    +btnFill('對全區廣播…','echo ')+btnFill('改等級（advance）…','advance self ')+btnFill('強制指令（force）…','force ')
+    +'</div><div class="sec">查別的職業最強裝備</div><div class="pa pad0">'+R.CONST.classes.map(c=>btn(esc(c.cname),'bestgear list '+R.lc(c.name))).join('')+'</div>';
 }
 function renderImm(ch){
   if(!R.isImm(ch))return '<div class="hint pad">只有站長可以用。</div>';

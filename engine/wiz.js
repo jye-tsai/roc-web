@@ -553,16 +553,32 @@ R.ownerBoost=function(ch){
 };
 
 /* ── bestgear（網頁版加的站長工具）：全站每個部位挑分數最高的裝備，載入並穿上 ──
-   分數是網頁版自訂的估算（不是原版公式）：命中×4、傷害×6、AC 每點 1.5、生命 0.5、魔法 0.3、移動 0.2、
-   五項屬性×8、閃避每點 1（負的較好）、減傷／加傷×2、豁免每點 1（負的較好）、PP×2；防具 v0×1.5；武器平均骰子傷害×4 */
+   分數是網頁版自訂的估算（不是原版公式），依職業的定位調整比重：
+   基本：命中×4、傷害×6、AC 每點 1.5、生命 0.5、魔法 0.3、移動 0.2、屬性×8、閃避／豁免每點 1（負的較好）、減傷／加傷×2、PP×2；防具 v0×1.5；武器骰子平均×4。
+   定位再覆蓋部分權重，職業的主屬性（class prime）權重再加倍 */
 const GEAR_W={HITROLL:4,DAMROLL:6,AC:-1.5,HIT:.5,MANA:.3,MOVE:.2,STR:8,INT:8,WIS:8,DEX:8,CON:8,DODGE:-1,REDUCE_DAMAGE:2,REDUCE_MAGIC:2,
-  APPLY_ADAMAGE:2,APPLY_AMAGIC:2,POWER_POTENTIAL:2};
-R.gearScore=p=>{
+  APPLY_ADAMAGE:2,APPLY_AMAGIC:2,POWER_POTENTIAL:2,SAVING:-1,ARMOR:1.5,DICE:4};
+const GEAR_ROLE={
+  caster:{n:'法系',w:{HITROLL:1,DAMROLL:1,HIT:.4,MANA:1,INT:12,WIS:10,APPLY_AMAGIC:5,REDUCE_MAGIC:3,POWER_POTENTIAL:4,SAVING:-1.5,DICE:.5}},
+  healer:{n:'治療',w:{HITROLL:1.5,DAMROLL:1.5,HIT:.6,MANA:1,WIS:12,INT:10,APPLY_AMAGIC:3,REDUCE_MAGIC:3,POWER_POTENTIAL:3,SAVING:-1.5,DICE:1}},
+  rogue:{n:'敏捷',w:{HITROLL:6,DAMROLL:5,DEX:12,DODGE:-2,MOVE:.3,DICE:4}},
+  fighter:{n:'戰士',w:{HITROLL:4,DAMROLL:7,AC:-2,HIT:.7,STR:12,REDUCE_DAMAGE:3,APPLY_ADAMAGE:3,ARMOR:2,DICE:5,MANA:.1}},
+  brute:{n:'體魄',w:{HITROLL:3,DAMROLL:7,HIT:1,CON:12,STR:10,REDUCE_DAMAGE:4,APPLY_ADAMAGE:3,DICE:5,MANA:.1}}};
+/* 推測：職業對應定位（依職業名稱與主屬性判斷，原版沒有這種分類） */
+const CLASS_ROLE={Mage:'caster',Wizard:'caster',Sorcerer:'caster',Alchemist:'caster',Savant:'caster',Cleric:'healer',Bishop:'healer',Shaman:'healer',
+  Thief:'rogue',Assassin:'rogue',Ninja:'rogue',Ranger:'rogue',Monk:'rogue',Warrior:'fighter',Knight:'fighter',Swordsman:'fighter',Lord:'fighter',Warlord:'fighter',
+  Barbarian:'brute',Martialman:'brute'};
+const gearWeights=cls=>{
+  const k=R.CONST.classes[cls]||{},role=GEAR_ROLE[CLASS_ROLE[k.name]]||{n:'通用',w:{}},w=Object.assign({},GEAR_W,role.w);
+  const pa=String(k.prime||'').replace(/^APPLY_/,'');if(w[pa])w[pa]*=2;
+  return {w,role:role.n};
+};
+R.gearScore=(p,w=GEAR_W)=>{
   let sc=0;
-  for(const a of p.applies||[]){const w=GEAR_W[a.type]??(/^SAVING_/.test(a.type)?-1:0);sc+=w*(+a.value||0);}
+  for(const a of p.applies||[]){const x=w[a.type]??(/^SAVING_/.test(a.type)?w.SAVING:0);sc+=x*(+a.value||0);}
   const v=(p.values||[]).map(x=>+x||0);
-  if(p.item_type==='ARMOR')sc+=v[0]*1.5;
-  if(p.item_type==='WEAPON')sc+=v[1]*(v[2]+1)/2*4;
+  if(p.item_type==='ARMOR')sc+=v[0]*w.ARMOR;
+  if(p.item_type==='WEAPON')sc+=v[1]*(v[2]+1)/2*w.DICE;
   return Math.round(sc);
 };
 /* 部位：[穿戴旗標, 位置們, 名稱]；戒指／頸／腕各兩個 */
@@ -572,17 +588,21 @@ const GEAR_SLOTS=[['LIGHT',[0],'光源'],['WEAR_FINGER',[1,2],'手指'],['WEAR_N
 /* 一般模式排除：神之領域、幫會區域、PERSONAL／CLAN 專屬物品（all 模式全部算） */
 const godItem=p=>(p.area&&(p.area.id==='immhall'||/幫會/.test(p.area.name)))||(p.extra_flags||[]).some(f=>f==='PERSONAL'||f==='CLAN');
 const mainSlot=p=>p.item_type==='LIGHT'?'LIGHT':(p.wear_flags||[]).find(f=>f!=='TAKE');   /* 每件只算在第一個穿戴部位 */
-function bestFor(flag,n,all){
+function bestFor(flag,n,all,w){
   const ok=p=>mainSlot(p)===flag&&(flag!=='WIELD'||p.item_type==='WEAPON')&&(flag==='WIELD'||flag==='LIGHT'||p.item_type!=='WEAPON')
     &&!(p.extra_flags||[]).includes('NOREMOVE')&&(all||!godItem(p));
-  return Object.values(W.objs).filter(ok).map(p=>[p,R.gearScore(p)]).sort((a,b)=>b[1]-a[1]).slice(0,n);
+  return Object.values(W.objs).filter(ok).map(p=>[p,R.gearScore(p,w)]).sort((a,b)=>b[1]-a[1]).slice(0,n);
 }
 cmd.bestgear=function(ch,argument){
   if(ch.npc||!R.isImm(ch)){R.send(ch,'什麼？\n');return;}
   const a=R.lc(argument||''),listOnly=/\blist\b/.test(a),all=/\ball\b/.test(a);
-  let s=C.HIY+(listOnly?'全站各部位最強裝備（估算分數）':'自動換上全站最強裝備')+(all?'（含神之領域與幫會裝備）':'（不含神之領域與幫會裝備）')+'：'+C.NOR+'\n';
+  /* 可以指定職業：bestgear list mage（查別的職業用；穿上一律照自己的職業） */
+  let cls=ch.cls;
+  for(const t of a.split(/\s+/)){if(['list','all',''].includes(t))continue;const i=R.CONST.classes.findIndex(c=>R.lc(c.name)===t||R.lc(c.who)===t||c.cname===t);if(i>=0&&listOnly)cls=i;}
+  const {w,role}=gearWeights(cls),k=R.CONST.classes[cls]||{};
+  let s=C.HIY+(listOnly?'全站各部位最強裝備':'自動換上全站最強裝備')+'（'+k.cname+'・'+role+'取向'+(all?'・含神器':'')+'）：'+C.NOR+'\n';
   for(const [flag,locs,label] of GEAR_SLOTS){
-    const best=bestFor(flag,locs.length,all);
+    const best=bestFor(flag,locs.length,all,w);
     best.forEach(([p,sc],i)=>{
       s+=R.pad(label,9)+R.strip(p.short_description||'')+' #'+p.vnum+' 分數 '+sc+' '+C.HIB+(p.area?p.area.name:'')+C.NOR+'\n';
       if(listOnly)return;
