@@ -168,6 +168,21 @@ cmd.score=function(ch){
   const ps={0:'你'+C.RED+'死'+C.NOR+'了！！',1:'你'+C.HIR+'受了致命'+C.NOR+'傷。',2:'你'+C.HIB+'失去行動能力'+C.NOR+'了。',3:'你'+C.HIB+'不省人事'+C.NOR+'了。',
     4:'你在睡覺。',5:'你動彈不得。',6:'你在休息。',7:'你正在戰鬥。',8:'你正站著。'};
   s+=ps[ch.position]+'\n';
+  /* 現在狀態（act_info.c do_score：依 AFF／PLR 位元與飢渴醉） */
+  const st=[],cd=ch.pc?ch.pc.cond||[0,100,100]:[0,100,100],imm=R.isImm(ch),A=f=>ch.aff.has(f);
+  if(ch.act.has('FIST_FIGHT'))st.push('徒手搏鬥');
+  if(A('HIDE'))st.push(C.HIB+'藏匿'+C.NOR);if(A('INVISIBLE'))st.push(C.YEL+'隱形'+C.NOR);
+  const dk=cd[0]||0;if(dk>=70)st.push(C.HIR+'酒精中毒'+C.NOR);else if(dk>=50)st.push(C.HIR+'爛醉'+C.NOR);else if(dk>=20)st.push(C.HIR+'喝醉'+C.NOR);else if(dk>0)st.push(C.RED+'微醺'+C.NOR);
+  if(!imm){const th=cd[2],fu=cd[1];
+    if(th<40&&th>10)st.push(C.HIY+'口渴'+C.NOR);if(fu<40&&fu>10)st.push(C.HIP+'肚子餓了'+C.NOR);
+    if(th<=10&&th>=0)st.push(C.YEL+'脫水'+C.NOR);if(fu<=10&&fu>=0)st.push(C.PUR+'飢餓'+C.NOR);}
+  for(const [f,t] of [['POISON',C.HIG+'中毒'],['DISEASE',C.HIU+'生病'],['PARALYZED',C.YEL+'麻痺'],['FEAR',C.CYN+'恐懼'],['CRAZY',C.PUR+'瘋狂'],['CURSE',C.HIB+'詛咒'],['MUTE',C.HIY+'沉默'],['SEAL_MAGIC',C.HIC+'封咒']])if(A(f))st.push(t+C.NOR);
+  if(ch.act.has('RIDE'))st.push('座騎');
+  s+='現在狀態：'+st.join(' ')+'\n';
+  /* 網頁版加的：身上的法術效果（原版要另打 affect） */
+  const sp={};for(const a of ch.affects||[])if(!a.deleted&&R.SK[a.type])sp[a.type]=Math.max(sp[a.type]??-1,a.duration);
+  const ks=Object.keys(sp);
+  if(ks.length)s+='法術效果：'+ks.map(k=>C.HIG+R.SK[k].cname+C.NOR+(sp[k]>=0?'('+sp[k]+')':'(永久)')).join(' ')+'\n';
   s+='物品: '+R.carryN(ch)+'/'+R.canCarryN(ch)+'   負重: '+R.carryW(ch)+'/'+R.canCarryW(ch)+' 公斤  金錢: '+C.HIY+ch.gold+C.NOR+' 元  存款: '+ch.bank+' 元\n';
   s+='Autoexit: '+(ch.act.has('AUTOEXIT')?'是':'否')+'   Autoloot: '+(ch.act.has('AUTOLOOT')?'是':'否')+'   Autogold: '+(ch.act.has('AUTOGOLD')?'是':'否')+'\n';
   s+='命中率：'+C.HIC+(ch.hitroll||0)+C.NOR+' 點   傷害力：'+C.HIC+(ch.damroll||0)+C.NOR+' 點   護甲防衛力：'+C.HIC+ch.armor+C.NOR+' 點\n';
