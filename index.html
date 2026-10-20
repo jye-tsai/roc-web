@@ -93,6 +93,9 @@
   #sheet .subs{display:flex;overflow-x:auto;border-bottom:1px solid #222;background:#0e0e0e}
   #sheet .subs button{flex:1 0 auto;border:0;border-radius:0;background:none;color:#888;padding:8px 10px}
   #sheet .subs button.cur{color:#ff5;border-bottom:2px solid #ff5}
+  #sheet .crumb{padding:6px 10px;font-size:13px;color:#888;background:#0c0c0c;border-bottom:1px solid #222}
+  #sheet .crumb button{background:none;border:0;color:#5ff;padding:2px 0;font:inherit;font-size:13px}
+  #sheet .crumb b{color:#ff5}
   #sheet #immq{flex:1;background:#000;color:#fff;border:1px solid #444;border-radius:4px;padding:6px 8px;font:inherit;font-size:16px}
   #sheet .desc{width:100%;white-space:pre-wrap;color:#bbb;font-size:13px;line-height:1.5;background:#0c0c0c;border-left:2px solid #444;padding:6px 8px;box-sizing:border-box}
   #sheet .sub{width:100%;border-left:2px solid #333;padding-left:8px;display:flex;flex-direction:column;gap:4px}
@@ -336,7 +339,7 @@
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
 Term.measure();
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261020s';
+const V='20261020u';
 /* async=false：同時下載、依插入順序執行 */
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){

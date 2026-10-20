@@ -158,7 +158,22 @@ function renderLearn(ch){
 }
 
 /* ---- 站長選單：imm 指令改用點的（技能設定、載入物品／怪物、傳送、角色數值） ---- */
-let immSub='quick',immQ='';
+let immSub='quick',immQ='',immNav=[];
+const TYPE_NAME={WEAPON:'武器',ARMOR:'防具',TREASURE:'寶物',STAFF:'法杖',WAND:'魔杖',POTION:'藥水',SCROLL:'卷軸',PILL:'藥丸',LIGHT:'光源',CONTAINER:'容器',
+  FOOD:'食物',DRINK_CON:'水壺',KEY:'鑰匙',ARROW:'箭矢',DART:'飛鏢',BOAT:'船',FURNITURE:'家具',FOUNTAIN:'泉水',MONEY:'金錢',TRASH:'雜物',CORPSE_NPC:'屍體',CORPSE_PC:'玩家屍體'};
+const WEAR_NAME={WEAR_BODY:'身體',WEAR_HEAD:'頭部',WEAR_WRIST:'手腕',WEAR_SHIELD:'盾牌',WEAR_FEET:'腳',WEAR_WAIST:'腰',WEAR_ARMS:'手臂',WEAR_FINGER:'戒指',
+  WEAR_ABOUT:'披風',WEAR_LEGS:'腿',WEAR_HANDS:'手套',WEAR_NECK:'項鍊',HOLD:'握持',ARROW:'箭袋',WIELD:'武器',OTHER:'其他'};
+const weaponName=k=>(R.CORE.attacks[+k]||'其他')+'類';
+const lvBucket=p=>Math.floor(Math.max(0,p.level||0)/10)*10;
+function navLabel(path,isO){
+  const x=path[path.length-1];
+  if(x.startsWith('lv:'))return '等級 '+x.slice(3)+'～'+(+x.slice(3)+9);
+  if(path.length===1)return {type:'依種類',area:'依區域',lv:'依等級'}[x]||x;
+  if(path[0]==='area'){const a=R.world.areas.find(a=>a.id===x);return a?a.name:x;}
+  if(path[0]==='lv')return '等級 '+x+'～'+(+x+9);
+  if(path.length===2)return TYPE_NAME[x]||x;
+  return path[1]==='WEAPON'?weaponName(x):WEAR_NAME[x]||x;
+}
 const IMM_SUBS=[['quick','快捷'],['sk','技能'],['obj','物品'],['mob','怪物'],['room','傳送'],['me','角色']];
 const ql=s=>R.lc(R.strip(String(s||'')));
 function immList(ch){
@@ -179,15 +194,42 @@ function immList(ch){
     return h;
   }
   if(immSub==='obj'||immSub==='mob'){
-    const isO=immSub==='obj',list=Object.values(isO?W.objs:W.mobs).filter(p=>hit(p,p.short_description+' '+p.keywords+' '+(p.area&&p.area.name))).sort((a,b)=>(a.level||0)-(b.level||0)||a.vnum-b.vnum).slice(0,60);
-    if(!q)h+='<div class="hint pad">打名字（中英文都可）、區域名或編號搜尋。</div>';
-    for(const p of list){
+    const isO=immSub==='obj',all=Object.values(isO?W.objs:W.mobs).sort((a,b)=>(a.level||0)-(b.level||0)||a.vnum-b.vnum);
+    const rowsOf=list=>list.map(p=>{
       const k='im'+immSub+':'+p.vnum,open=openKey===k;
-      h+='<div class="it'+(open?' open':'')+'"><div class="ih" data-k="'+k+'"><span class="nm">'+esc(R.strip(p.short_description||''))+' <small>#'+p.vnum+' · '+esc(p.area?p.area.name:'')+'</small></span><span class="tg">Lv'+(p.level||0)+(isO?' '+esc(p.item_type||''):'')+'</span></div>';
-      if(open)h+='<div class="ia">'+(isO?btn('載入','oload '+p.vnum,'pri')+btn('載入（我的等級）','oload '+p.vnum+' '+ch.level):btn('召喚到這裡','mload '+p.vnum,'pri'))+'</div>';
-      h+='</div>';
+      return '<div class="it'+(open?' open':'')+'"><div class="ih" data-k="'+k+'"><span class="nm">'+esc(R.strip(p.short_description||''))+' <small>#'+p.vnum+' · '+esc(p.area?p.area.name:'')+'</small></span><span class="tg">Lv'+(p.level||0)+(isO?' '+esc(TYPE_NAME[p.item_type]||p.item_type||''):'')+'</span></div>'
+        +(open?'<div class="ia">'+(isO?btn('載入','oload '+p.vnum,'pri')+btn('載入（我的等級）','oload '+p.vnum+' '+ch.level):btn('召喚到這裡','mload '+p.vnum,'pri'))+'</div>':'')+'</div>';}).join('');
+    if(q){const list=all.filter(p=>hit(p,p.short_description+' '+p.keywords+' '+(p.area&&p.area.name))).slice(0,60);return rowsOf(list)+more(list.length);}
+    /* 沒打字：分類一路點下去（immNav 記路徑） */
+    const nav=immNav,go=(path,label,n)=>'<div class="it"><div class="ih" data-nav="'+esc(path.join('|'))+'"><span class="nm">'+esc(label)+'</span><span class="tg">'+n+' ▸</span></div></div>';
+    const crumbs=['全部'].concat(nav.map((x,i)=>navLabel(nav.slice(0,i+1),isO)));
+    h+='<div class="crumb">'+crumbs.map((c,i)=>i<crumbs.length-1?'<button data-nav="'+esc(nav.slice(0,i).join('|'))+'">'+esc(c)+'</button> › ':'<b>'+esc(c)+'</b>').join('')+'</div>';
+    const groups=(list,keyFn,labelFn,path)=>{const m=new Map();for(const p of list){const k=keyFn(p);if(k==null)continue;(m.get(k)||m.set(k,[]).get(k)).push(p);}
+      return [...m].sort(keyFn===lvBucket?(a,b)=>a[0]-b[0]:(a,b)=>b[1].length-a[1].length)   /* 等級區間由低到高，其他依數量 */.map(([k,v])=>go(path.concat(String(k)),labelFn(k),v.length)).join('');};
+    const byLv=(list,path)=>{   /* 太多就先分等級區間 */
+      const lvSel=path.find(x=>x.startsWith('lv:'));
+      if(lvSel){const b=+lvSel.slice(3);return rowsOf(list.filter(p=>lvBucket(p)===b));}
+      if(list.length<=40)return rowsOf(list);
+      return groups(list,lvBucket,b=>'等級 '+b+'～'+(b+9),path.map(String)).replace(/data-nav="([^"]*)\|(\d+)"/g,'data-nav="$1|lv:$2"');
+    };
+    if(!nav.length)return h+(isO?go(['type'],'依種類（武器、防具…）',all.length):go(['lv'],'依等級',all.length))+go(['area'],'依區域',all.length);
+    if(nav[0]==='area'){
+      if(nav.length===1)return h+W.areas.map(a=>{const n=all.filter(p=>p.area===a).length;return n?go(['area',a.id],a.name,n):'';}).join('');
+      return h+byLv(all.filter(p=>p.area&&p.area.id===nav[1]),nav);
     }
-    return h+more(list.length);
+    if(nav[0]==='lv'){
+      if(nav.length===1)return h+groups(all,lvBucket,b=>'等級 '+b+'～'+(b+9),['lv']);
+      return h+rowsOf(all.filter(p=>String(lvBucket(p))===nav[1]));
+    }
+    /* 依種類 */
+    if(nav.length===1)return h+groups(all,p=>p.item_type,t=>TYPE_NAME[t]||t,['type']);
+    const T=nav[1],ofT=all.filter(p=>p.item_type===T);
+    if(T==='WEAPON'||T==='ARMOR'){
+      const sub=T==='WEAPON'?p=>String(+p.values[3]||0):p=>(p.wear_flags||[]).find(f=>f!=='TAKE')||'OTHER';
+      if(nav.length===2)return h+groups(ofT,sub,k=>T==='WEAPON'?weaponName(k):WEAR_NAME[k]||k,['type',T]);
+      return h+byLv(ofT.filter(p=>sub(p)===nav[2]),nav);
+    }
+    return h+byLv(ofT,nav);
   }
   if(immSub==='room'){
     if(!q){
@@ -794,7 +836,8 @@ function init(){
   const sh=$('sheet');
   sh.addEventListener('click',e=>{
     const b=e.target.closest('button,.ih');if(!b)return;
-    if(b.dataset.isub){immSub=b.dataset.isub;immQ='';openKey=null;renderSheet();return;}
+    if(b.dataset.isub){immSub=b.dataset.isub;immQ='';immNav=[];openKey=null;renderSheet();return;}
+    if(b.dataset.nav!==undefined){immNav=b.dataset.nav?b.dataset.nav.split('|'):[];openKey=null;renderSheet();$('sheet').querySelector('.body').scrollTop=0;return;}
     if(b.dataset.tab){tab=b.dataset.tab;openKey=giveFor=putFor=null;renderSheet();return;}
     if(b.dataset.close!==undefined){closeSheet();return;}
     if(b.dataset.k&&b.tagName==='BUTTON'){openKey=openKey===b.dataset.k?null:b.dataset.k;renderSheet();return;}
