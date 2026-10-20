@@ -312,6 +312,7 @@ function linkify(t){
   t=t.replace(/^(North|South|East|West|Up|Down)(?=\s+-)/gm,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 文字裡的指令提示：look sign / help newbie */
   t=t.replace(/\b((?:look|help) [A-Za-z](?:[A-Za-z0-9']*[A-Za-z0-9])?)/gi,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
+  t=t.replace(/\b((?:oload|mload|goto) \d+)\b/g,m=>'<u class="lk cmd" data-cmd="'+m+'">'+m+'</u>');   /* 站長：點編號直接載入／傳送 */
   /* 中文名(english keyword) */
   t=t.replace(/([^\s()<>\[\]，。、：:；;「」]{0,8})\(([A-Za-z][A-Za-z0-9'\- ]{0,40})\)/g,
     (m,pre,kw)=>{for(const w of R.lc(kw.trim()).split(/\s+/))seenKw.add(w);seenKw.add(R.lc(kw.trim()));return '<u class="lk '+kwKind(kw)+'" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>';});

@@ -269,7 +269,8 @@ cmd.owhere=function(ch,argument){
 
 /* ── mload / oload / purge ──────────────────────────── */
 cmd.mload=function(ch,argument){
-  const [arg]=R.one_arg(argument);
+  let [arg]=R.one_arg(argument);
+  if(arg&&!isNum(arg)){const p=byName(ch,arg,Object.values(W.mobs),'mload');if(!p)return;arg=String(p.vnum);}
   if(!arg||!isNum(arg)){R.send(ch,'Syntax: mload <vnum>.\n');return;}
   const p=W.mobs[+arg];
   if(!p){R.send(ch,'No mob has that vnum.\n');return;}
@@ -279,8 +280,18 @@ cmd.mload=function(ch,argument){
   R.act('$n 變出了 $N。',ch,null,victim,R.TO_ROOM);
   R.act('你 變出了 $N。',ch,null,victim,R.TO_CHAR);
 };
+/* 網頁版加的：oload／mload 可以打名字（中英文），只有一個符合就直接載入，多個就列出編號 */
+function byName(ch,arg,list,verb){
+  const q=R.lc(arg),hits=list.filter(p=>R.is_name(arg,p.keywords||'')||R.lc(R.strip(p.short_description||'')).includes(q)).sort((a,b)=>a.vnum-b.vnum);
+  if(!hits.length){R.send(ch,'找不到名字有「'+arg+'」的東西。\n');return null;}
+  const exact=hits.filter(p=>R.lc(p.keywords||'').split(/\s+/).includes(q));
+  if(hits.length===1||exact.length===1)return exact[0]||hits[0];
+  R.send(ch,'符合的有 '+hits.length+' 個，請用編號 '+verb+' <編號>：\n'+hits.slice(0,20).map(p=>verb+' '+p.vnum+'  '+R.strip(p.short_description||'')+' Lv'+(p.level||0)).join('\n')+(hits.length>20?'\n…（還有 '+(hits.length-20)+' 個，打更完整的名字）':'')+'\n');
+  return null;
+}
 cmd.oload=function(ch,argument){
-  const [arg1,rest]=R.one_arg(argument);
+  let [arg1,rest]=R.one_arg(argument);
+  if(arg1&&!isNum(arg1)){const p=byName(ch,arg1,Object.values(W.objs),'oload');if(!p)return;arg1=String(p.vnum);}
   const [arg2]=R.one_arg(rest);
   if(!arg1||!isNum(arg1)){R.send(ch,'Syntax: oload <vnum> <level>.\n');return;}
   let level;
