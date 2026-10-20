@@ -67,7 +67,7 @@ function showChar1(v,ch){
   let s=R.PERS(v,ch)+' - '+r.cname+'('+r.name+'):\n';
   /* 玩家的 desc 是連線物件，不是描述文字 */
   const ds=v.npc?v.desc:v.pc&&v.pc.description;
-  s+=typeof ds==='string'&&ds?ds.replace(/\n+$/,'')+'\n':['它','他','她'][v.sex]+'看起來沒有什麼特色。\n';
+  s+=typeof ds==='string'&&ds?R.fit(ds.replace(/\n+$/,''))+'\n':['它','他','她'][v.sex]+'看起來沒有什麼特色。\n';
   s+=R.healthLine(v,ch)+'\n';
   const eq=R.EQ_ORDER.map(l=>R.getEq(v,l)).filter(Boolean);
   if(eq.length){s+='\n'+['它','他','她'][v.sex]+'身上穿著：\n';for(const o of eq)s+=R.WHERE_NAME[o.wear_loc]+fmtObj(o,ch,true)+'\n';}
@@ -90,7 +90,7 @@ R.lookRoom=function(ch,arg){
   if(R.isImm(ch))s+='['+C.HIY+r.vnum+C.NOR+'] ';
   s+=r.name+' - ';
   if(ch.act.has('AUTOEXIT'))s+=exitsLine(ch,true);else s+='\n';
-  if(!arg||!ch.act.has('BRIEF'))s+='    '+r.desc.replace(/\n+$/,'')+'\n';
+  if(!arg||!ch.act.has('BRIEF'))s+=R.fit('    '+r.desc.replace(/\n+$/,''))+'\n';
   const people=r.people.filter(v=>v!==ch&&R.canSee(ch,v));
   if(people.length){s+='\n';for(const v of people)s+=showChar0(v,ch);}
   if(r.contents.length){s+='\n'+showList(r.contents,ch,false,false);}
@@ -117,7 +117,7 @@ cmd.look=function(ch,a){
   const v=R.getCharRoom(ch,a1);if(v){showChar1(v,ch);return;}
   const [n,nm]=R.num_arg(a1);let c=0;
   for(const o of [...ch.carrying,...ch.room.contents]){
-    for(const e of o.extra_descr)if(R.is_name(nm,e.keywords)&&++c===n){R.send(ch,e.description);return;}
+    for(const e of o.extra_descr)if(R.is_name(nm,e.keywords)&&++c===n){R.send(ch,R.fit(e.description));return;}
     if(R.is_name(nm,o.name)&&++c===n){
       let s=o.short+(o.material?' - '+o.material:'')+'\n';
       const ed=o.extra_descr.find(e=>R.is_name(o.name.split(' ')[0],e.keywords));
@@ -125,7 +125,7 @@ cmd.look=function(ch,a){
       R.send(ch,s);return;
     }
   }
-  for(const e of ch.room.extra)if(R.is_name(nm,e.keywords)){R.send(ch,e.description);return;}
+  for(const e of ch.room.extra)if(R.is_name(nm,e.keywords)){R.send(ch,R.fit(e.description));return;}
   const d=R.dirIndex(a1);
   if(d<0){R.send(ch,C.YEL+'你在這裡沒看到那玩意兒。'+C.NOR+'\n');return;}
   const e=ch.room.exits[d];
@@ -191,7 +191,7 @@ cmd.help=function(ch,a){
   let hits=ok.filter(h=>h.keywords.toUpperCase().split(/\s+/).includes(A)||h.keywords.toUpperCase()===A);
   if(!hits.length)hits=ok.filter(h=>R.is_name(a,h.keywords)).slice(0,1);
   if(!hits.length){R.send(ch,C.YEL+'沒有關於這個字的說明喔！'+C.NOR+'\n');return;}
-  R.send(ch,hits.map(h=>(h.level>=0&&a!=='imotd'?h.keywords+'\n':'')+String(h.text).replace(/^\./,'')).join('\n'+'-'.repeat(76)+'\n\n'));
+  R.send(ch,hits.map(h=>(h.level>=0&&a!=='imotd'?h.keywords+'\n':'')+R.fit(String(h.text).replace(/^\./,''))).join('\n'+'-'.repeat(R.narrow()?R.cols-2:76)+'\n\n'));
 };
 
 const DAY=['月','風','蒼','雷','自由','聖神','星'];

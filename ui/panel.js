@@ -111,7 +111,44 @@ function renderSkills(ch){
   if(sp.length){h+='<div class="sec">法術</div>';for(const sn of sp)h+=skRow(sn,true);}
   if(act.length){h+='<div class="sec">技能</div>';for(const sn of act)h+=skRow(sn,false);}
   if(!sp.length&&!act.length)h+='<div class="hint pad">你還沒學會可以主動使用的技能或法術。到導師那裡用 practice 學習。</div>';
+  h+='<div class="pad"><button data-tab="learn">📖 全部技能與說明（學技能）</button></div>';
   if(pas.length)h+='<div class="sec">被動技能</div><div class="pas">'+pas.map(sn=>'<span>'+esc(SK()[sn].cname)+' '+pctOf(ch,sn)+'%</span>').join('')+'</div>';
+  return h;
+}
+
+/* ---- 學技能：手機版的 practice／slist，一個技能一列，點開看說明與練習 ---- */
+function skillHelp(name){
+  const N=name.toUpperCase();
+  const h=R.CORE.helps.find(x=>{const k=x.keywords.toUpperCase();return k.includes("'"+N+"'")||k.split(/\s+/).includes(N);});
+  return h?R.reflow(R.strip(String(h.text).replace(/^\./,''))).trim():'';
+}
+function renderLearn(ch){
+  const tutor=ch.room.people.find(m=>!m.deleted&&m.npc&&m.act&&m.act.has('PRACTICE')&&m.psk);
+  let money=ch.level*ch.level*20;if(ch.cls<5)money=Math.floor(money/2);
+  let h='<div class="top"><span class="hint">練習點 <b>'+ch.practice+'</b>'+(ch.cls>4?'・每次 '+money+' 金':'')+'　'
+    +(tutor?'導師：'+esc(R.strip(R.PERS(tutor,ch))):'這裡沒有導師')+'</span></div>';
+  if(!tutor)h+='<div class="hint pad">要在導師（新手學校的學術教授、各職業公會的導師）面前才能練習。下面可以先看每個技能的說明。</div>';
+  else if(ch.level<(R.easy(ch)?R.EASY.practiceLv:3))h+='<div class="hint pad">三級以上才能練習（practice），先去訓練（train）或打怪升級吧！</div>';
+  const rows={here:[],have:[],later:[],other:[]};
+  for(let sn=1;sn<SK().length;sn++){
+    const req=R.skillReqLevel(ch,sn);if(req===R.L_APP)continue;
+    const pc=pctOf(ch,sn),teach=tutor&&R.isSkname(SK()[sn].name,tutor.psk)!==-1;
+    (req>ch.level?rows.later:teach&&pc<R.skillMaxPercent(ch,sn)?rows.here:pc?rows.have:rows.other).push([sn,req,teach]);
+  }
+  const row=([sn,req,teach])=>{
+    const s=SK()[sn],k='ln:'+sn,open=openKey===k,pc=pctOf(ch,sn),mx=R.skillMaxPercent(ch,sn);
+    const tag=req>ch.level?'Lv'+req+' 才能學':pc+'%／'+mx+'%';
+    let x='<div class="it'+(open?' open':'')+'"><div class="ih" data-k="'+k+'"><span class="nm">'+esc(s.cname)+' <small>'+esc(s.name)+(s.fun?' · '+s.mana+'法':'')+'</small></span><span class="tg">'+tag+'</span></div>';
+    if(open){
+      const d=skillHelp(s.name);
+      x+='<div class="ia">'+(d?'<div class="desc">'+esc(d)+'</div>':'<div class="hint">（沒有說明）</div>');
+      if(teach&&req<=ch.level&&pc<mx)x+=btn('練習一次','practice \''+s.name+'\'','pri');
+      x+=btn('完整說明','help \''+s.name+'\'')+'</div>';
+    }
+    return x+'</div>';
+  };
+  const sec=(t,a)=>a.length?'<div class="sec">'+t+'</div>'+a.map(row).join(''):'';
+  h+=sec('這裡可以學',rows.here)+sec('已學會',rows.have)+sec('還不能學（等級不足）',rows.later)+sec('其他導師教',rows.other);
   return h;
 }
 
@@ -207,7 +244,7 @@ function linkify(t){
   /* exits 列表：North  - 某某地方 */
   t=t.replace(/^(North|South|East|West|Up|Down)(?=\s+-)/gm,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 文字裡的指令提示：look sign / help newbie */
-  t=t.replace(/\b((?:look|help) [A-Za-z](?:[A-Za-z']*[A-Za-z])?)/gi,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
+  t=t.replace(/\b((?:look|help) [A-Za-z](?:[A-Za-z0-9']*[A-Za-z0-9])?)/gi,m=>'<u class="lk cmd" data-cmd="'+m.toLowerCase()+'">'+m+'</u>');
   /* 中文名(english keyword) */
   t=t.replace(/([^\s()<>\[\]，。、：:；;「」]{0,8})\(([A-Za-z][A-Za-z0-9'\- ]{0,40})\)/g,
     (m,pre,kw)=>{for(const w of R.lc(kw.trim()).split(/\s+/))seenKw.add(w);seenKw.add(R.lc(kw.trim()));return '<u class="lk '+kwKind(kw)+'" data-kw="'+kw.replace(/"/g,'')+'">'+pre+'('+kw+')</u>';});
@@ -244,7 +281,7 @@ function ctxMenu(kw,label){
         if(v.npc&&v!==f)h+=btn('攻擊','kill '+r,'warn');
         if(v.shop)h+=btn('商品','list','pri');
         if(v.npc)h+=talkButtons(ch,v,r);
-        if(v.psk)h+=btn('學技能','practice','pri');
+        if(v.psk)h+='<button data-open="learn|" class="pri">學技能</button>';
         if(v.npc&&v.act&&v.act.has('TRAIN'))h+='</div><div class="pt">訓練 <small>練習點 '+ch.practice+'・金 '+ch.gold+'</small></div><div class="pa">'+btn('可練項目','train','pri')
           +[['str','力量'],['int','智能'],['wis','智慧'],['dex','敏捷'],['con','體質'],['hp','生命'],['mana','魔法'],['move','移動'],['practice','練習點']].map(([a,n])=>btn(n,'train '+a)).join('')
           +[['hp-r','生命'],['mana-r','魔法'],['move-r','移動'],['practice-r','練習點']].map(([a,n])=>btn('盡量'+n,'train '+a)).join('');
@@ -414,7 +451,7 @@ const CMD_CAT=[
    ['group transfer','交接隊長','char'],['group leave','離開隊伍'],['group disband','解散隊伍'],['gtell','隊伍頻道','text'],['split','分錢','text'],['report','報告狀態'],['follow','跟隨','char'],['follow self','停止跟隨']]],
  ['溝通',[['talk','和 NPC 交談','npc'],['say','說話','text'],['chat','閒聊頻道','text'],['question','新手發問','text'],['answer','老手回答','text'],['music','心情點播','text'],
    ['auction','拍賣','text'],['shout','喊叫','text'],['yell','吶喊','text'],['rumor','謠言','text'],['emote','動作','text'],['tell','密語','pc'],['reply','回覆密語','text'],['dice','擲骰子','text']]],
- ['設定',[['save','存檔'],['practice','學技能'],['train','訓練屬性'],['afk','暫時離開'],['autosac','自動獻祭屍體'],['description','角色描述','text'],['bug','回報錯誤','text'],['idea','提供建議','text'],['config','設定一覽'],['channels','頻道設定'],['autoexit','自動顯示出口'],['autogold','自動撿錢'],['autoloot','自動撿屍體'],
+ ['設定',[['save','存檔'],['easy','簡易模式 開／關'],['practice','學技能'],['train','訓練屬性'],['afk','暫時離開'],['autosac','自動獻祭屍體'],['description','角色描述','text'],['bug','回報錯誤','text'],['idea','提供建議','text'],['config','設定一覽'],['channels','頻道設定'],['autoexit','自動顯示出口'],['autogold','自動撿錢'],['autoloot','自動撿屍體'],
    ['combine','合併物品'],['blank','空行'],['brief','簡短描述'],['compact','精簡模式'],['prompt','提示列格式','text'],['title','稱號','text'],['password','改密碼','text'],['quit','離開遊戲','warn']]],
 ];
 const cmdOk=(ch,w)=>{const c=w.split(' ')[0];const e=R.CONST.cmds.find(x=>x[0]===c);
@@ -497,7 +534,7 @@ function normalKeys(ch){
   for(const v of npcs){
     if(v.shop&&!bs.some(b=>b[1]==='list'))bs.push(['商店','list','ctx']);
     if(v.act&&v.act.has('TRAIN')&&!bs.some(b=>b[0]==='訓練'))bs.push(['訓練','@ctx:'+kwOf(v),'ctx']);
-    if(v.psk&&!bs.some(b=>b[1]==='practice'))bs.push(['學技能','practice','ctx']);
+    if(v.psk&&!bs.some(b=>b[0]==='學技能'))bs.push(['學技能','@learn','ctx']);
     if(v.act&&v.act.has('BANKER')&&!bs.some(b=>b[0]==='銀行'))bs.push(['銀行','@ctx:'+kwOf(v),'ctx']);
   }
   const talk=npcs.find(v=>R.MP&&R.MP.canTalk(v));
@@ -671,7 +708,7 @@ function renderSheet(){
   const body=sh.querySelector('.body');
   if(!ch||!ch.room){body.innerHTML='<div class="hint pad">進入遊戲後才能使用。</div>';return;}
   const st=body.scrollTop;
-  body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):tab==='sk'?renderSkills(ch):tab==='cmd'?renderCmds(ch):renderRoom(ch);
+  body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):tab==='sk'?renderSkills(ch):tab==='cmd'?renderCmds(ch):tab==='learn'?renderLearn(ch):renderRoom(ch);
   body.scrollTop=st;
 }
 function openSheet(t){

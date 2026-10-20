@@ -99,7 +99,8 @@ R.doSocial=function(ch,name,a){
 };
 cmd.socials=function(ch){
   let s='',i=0;
-  for(const x of R.CONST.socials){s+=R.pad(x[0],13);if(++i%6===0)s+='\n';}
+  const per=R.cols?Math.max(2,Math.min(6,Math.floor(R.cols/13))):6;
+  for(const x of R.CONST.socials){s+=R.pad(x[0],13);if(++i%per===0)s+='\n';}
   R.send(ch,s+'\n');
 };
 
@@ -128,8 +129,13 @@ cmd.title=function(ch,a){
 };
 const TOG={autoexit:'AUTOEXIT',autogold:'AUTOGOLD',autoloot:'AUTOLOOT',autosac:'AUTOSAC',combine:'COMBINE',blank:'BLANK',brief:'BRIEF',compact:'COMPACT'};
 Object.entries(TOG).forEach(([n,f])=>{cmd[n]=ch=>{if(ch.act.has(f)){ch.act.delete(f);R.send(ch,n+' 關閉。\n');}else{ch.act.add(f);R.send(ch,n+' 開啟。\n');}};});
+cmd.easy=function(ch){
+  if(ch.npc)return;
+  if(ch.act.has('HARDCORE')){ch.act.delete('HARDCORE');R.send(ch,C.HIG+'簡易模式開啟：'+C.NOR+'一級就能練技能、練習效果兩倍、升級練習點兩倍、經驗 1.5 倍。\n');}
+  else{ch.act.add('HARDCORE');R.send(ch,C.HIY+'簡易模式關閉：'+C.NOR+'改回原版規則。\n');}
+};
 cmd.config=function(ch){
-  let s='[ 設定 ]\n';
+  let s='[ 設定 ]\n  '+R.pad('easy',10)+(R.easy(ch)?C.HIG+'開'+C.NOR+' （簡易模式）':C.HIR+'關'+C.NOR+' （原版規則）')+'\n';
   for(const [n,f] of Object.entries(TOG))s+='  '+R.pad(n,10)+(ch.act.has(f)?C.HIG+'開'+C.NOR:C.HIR+'關'+C.NOR)+'\n';
   R.send(ch,s);
 };

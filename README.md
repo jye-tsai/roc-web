@@ -25,6 +25,7 @@
 | 情境按鈕（黃框） | 遇到才出現：回城、交談、訓練、學技能、商店、攻擊、地上、開門／開鎖、站起、醒來、休息、睡覺 |
 | 戰鬥模式 | 打架時自動換成：逃跑、回城、戰鬥技能、攻擊法術、治療法術、藥水 |
 | 快捷列 | 物品、技能可以「釘」上去 |
+| 學習分頁 | 全部技能一列一個，可看說明、在導師面前直接練習 |
 | 登入／建角 | 種族、職業、Y/N 都是按鈕；可「記住密碼」，下次點 ⚡ 角色直接進遊戲 |
 
 ## 這個版本做了什麼（改版紀錄）
@@ -39,14 +40,25 @@
 5. **登入加速**：程式同時下載，世界資料在背景載入，登入畫面約 1 秒出現（原本約 12 秒）。
 6. **train 指令**：依原版 `do_train` 移植（屬性、hp/mana/move/practice 與 `-r` 連續訓練）。
 7. **快捷鍵改版**：方向鍵加大，指令按鈕改成依情境出現；加回城鍵。
+8. **組隊、銀行、常用指令**：依原版移植 group／gtell（`;`）／split、deposit／withdraw、compare、where、report、whois、afk、autosac、auto、description、fill、wizlist、bug／idea／typo。
+   - 跟隨者、銀行員有對應按鈕。
+   - bug、idea、typo 的回報存在這台裝置的 localStorage（`roc.report`）。
+9. **手機排版**：
+   - 介面會量出終端機寬度（`R.cols`）。畫面窄時，說明、房間描述、物品描述原本的硬換行會接回去。
+   - practice、slist、spells 改成一行一個；commands、socials 的欄數依畫面寬度調整。
+   - 新增「學習」分頁：列出全部技能，分成這裡可學、已學會、等級不足、其他導師教；點開可看說明，也能直接練習。
+10. **簡易模式**：預設開啟，用 `easy` 切換，關掉就照原版規則。
+    - 新角色多 40,000 金幣、多 20 練習點。
+    - 一級就能練技能（原版要三級）。
+    - 每次練習的進步加倍。
+    - 升級拿到的練習點加倍。
+    - 打怪經驗 ×1.5。
 
 ## 還沒做／簡化的部分
 
 和原版相比，下列功能還沒有或是簡化過：
 
 **整套系統**
-- 組隊：group、gtell、split（經驗分配已有 groupGain，但沒有組隊指令）
-- 銀行：deposit、withdraw；存款欄位已經有了
 - 幫派 clan、留言板 note、拍賣 bid、騎乘 ride／馬匹
 - 進階職業轉職：skadv、skdemote（train 已支援進階職業的係數）
 - 任務紀錄：check quest
@@ -62,7 +74,8 @@
 - 指令型技能還沒做：bash door、circle、assassination、pick lock、poison weapon、snare、meditate、bandage、throw、charge、twin、lead、invoke、dark raid、stone form 等。
 
 **其他玩家指令**
-- compare、where、report、whois、wizlist、afk、auto／autocombat／autosac、description、fill、donate、repair、recover、bug／idea／typo。
+- autocombat、donate、repair、recover、order、store／receive。
+- 主城史卡拉貝沒有銀行員，最近的銀行在深土城、神話谷等地（原版就是這樣）。
 
 **戰鬥公式（簡化）**
 - 經驗值公式沒有完整移植 `xp_compute`。

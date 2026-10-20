@@ -158,6 +158,7 @@ function enterGame(d){
     if(pi!==undefined)ch.perm[pi]=16;
     ch.level=1;ch.exp=1000;
     ch.gold=10000+R.fuzzy(3)*R.fuzzy(4)*R.fuzzy(5)*10;
+    if(R.easy(ch)){ch.gold+=R.EASY.gold;ch.practice+=R.EASY.prac;}   /* 簡易模式：新手多給錢與練習點 */
     ch.hit=ch.max_hit;ch.mana=ch.max_mana;ch.move=ch.max_move;
     const t=CORE.titles[k.cname];ch.pc.title='- '+(t&&t[1]||'');
     ch.pc.prompt=DEF_PROMPT;

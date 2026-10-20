@@ -54,7 +54,8 @@ R.interpret=function(ch,line){
 /* 補幾個原版常用但簡單的指令 */
 cmd.commands=function(ch){
   let s='',i=0;
-  for(const c of R.CONST.cmds){if(lvOf(c[3])>ch.level)continue;const ok=cmd[c[1].replace(/^do_/,'')]||cmd[c[0]];if(!ok)continue;s+=R.pad(c[0],13);if(++i%6===0)s+='\n';}
+  const per=R.cols?Math.max(2,Math.min(6,Math.floor(R.cols/13))):6;   /* 依畫面寬度決定欄數 */
+  for(const c of R.CONST.cmds){if(lvOf(c[3])>ch.level)continue;const ok=cmd[c[1].replace(/^do_/,'')]||cmd[c[0]];if(!ok)continue;s+=R.pad(c[0],13);if(++i%per===0)s+='\n';}
   R.send(ch,s+'\n');
 };
 cmd.areas=function(ch){

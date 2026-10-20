@@ -213,7 +213,7 @@ function xpCompute(ch,v){
 function groupGain(ch,v){
   const members=ch.room.people.filter(p=>!p.npc&&R.isSameGroup(p,ch));   /* group_gain：同房間的隊友 */
   for(const p of members){
-    let xp=Math.floor(xpCompute(p,v)/members.length)||1;
+    let xp=Math.floor(xpCompute(p,v)/members.length*(R.easy(p)?R.EASY.expMul:1))||1;
     R.send(p,'你得到 '+C.HIG+xp+C.NOR+' 點經驗.\n');
     gainExp(p,xp);
   }
@@ -234,7 +234,7 @@ function advanceLevel(ch){
   const hp=Math.max(1,R.rand(c.hpmin,c.hpmax)+Math.floor((con-13)/2));
   const mn=c.fmana?R.rand(2,Math.max(2,Math.floor((R.stat(ch,1)+R.stat(ch,2))/4))):0;
   const mv=R.rand(4,Math.max(5,Math.floor((con+R.stat(ch,3))/5)));
-  const pr=Math.max(1,Math.floor(R.stat(ch,2)/5));
+  const pr=Math.max(1,Math.floor(R.stat(ch,2)/5))*(R.easy(ch)?R.EASY.levelPrac:1);
   ch.max_hit+=hp;ch.max_mana+=mn;ch.max_move+=mv;ch.practice+=pr;
   ch.base=ch.base||{};
   R.send(ch,'你獲得了 '+hp+' 點生命，'+mn+' 點魔法，'+mv+' 點移動，'+pr+' 次練習。\n');   /* 推測：原版字串未擷取 */

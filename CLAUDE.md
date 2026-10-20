@@ -31,6 +31,13 @@ ROC（混沌幻世）中文 MUD 的瀏覽器單機版。純前端、沒有建置
 - **劇本**：`engine/mprog.js`，依原版 mob_prog.c、room_prog.c、obj_prog.c 重寫。
   - 原版的處理順序：先代換 `$` 變數，再解譯。
   - 解譯時：room_mask 只攔現有指令；room_command 和 obj_command 只處理不存在的指令。
+- **手機排版**：`R.cols` 是終端機一行的半形字數，由 `index.html` 的 `Term.measure` 設定。
+  - `R.narrow()` 判斷是不是窄螢幕。
+  - `R.fit(s)` 在窄螢幕時把原版的硬換行接回去。
+  - 新的列表輸出要用 `R.narrow()` 或 `R.cols` 決定排版。
+- **簡易模式**：設定在 `R.EASY`；`R.easy(ch)` 只要角色的 act 沒有 HARDCORE 就是開啟。
+  - 調整難度只改這組常數，不要改到原版公式本身。
+- **組隊**：`ch.group={leader,name,members}`；判斷是否同隊一律用 `R.isSameGroup`。
 - **UI**：`ui/panel.js`。
   - 快捷鍵：平常模式用 `normalKeys(ch)` 依情境產生按鈕；戰鬥模式在 `renderCombatKeys`；方向鍵狀態在 `renderDir`。
   - 指令總表在 `CMD_CAT`。

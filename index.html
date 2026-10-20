@@ -86,6 +86,7 @@
   #sheet .hint{color:#777;font-size:13px;width:100%}
   #sheet .top .hint{width:auto;flex:1;text-align:right}
   #sheet .pad{padding:16px}
+  #sheet .desc{width:100%;white-space:pre-wrap;color:#bbb;font-size:13px;line-height:1.5;background:#0c0c0c;border-left:2px solid #444;padding:6px 8px;box-sizing:border-box}
   #sheet .sub{width:100%;border-left:2px solid #333;padding-left:8px;display:flex;flex-direction:column;gap:4px}
   #sheet .subi{display:flex;align-items:center;gap:8px}
   #sheet .subi span{flex:1}
@@ -151,7 +152,7 @@
 <div id="term"></div>
 <div id="loadbar">載入世界 0%</div>
 <div id="sheet">
-  <div class="tabs"><button data-tab="inv">物品</button><button data-tab="eq">裝備</button><button data-tab="room">地上</button><button data-tab="sk">技能</button><button data-tab="cmd">指令</button><button class="x" data-close>✕</button></div>
+  <div class="tabs"><button data-tab="inv">物品</button><button data-tab="eq">裝備</button><button data-tab="room">地上</button><button data-tab="sk">技能</button><button data-tab="learn">學習</button><button data-tab="cmd">指令</button><button class="x" data-close>✕</button></div>
   <div class="body"></div>
 </div>
 <div id="pop"><div class="pp"><div class="pb"></div><button class="px" data-x>關閉</button></div></div>
@@ -241,7 +242,15 @@
     const w=a.scrollWidth,fs=parseFloat(getComputedStyle(a).fontSize);
     if(w>avail&&w>0)a.style.fontSize=Math.max(3,fs*avail/w).toFixed(2)+'px';
   }
-  let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>Term.refit(),150);});
+  /* 終端機一行能放幾個半形字（引擎用來決定排版：R.cols） */
+  function measure(){
+    const s=document.createElement('span');s.textContent='MMMMMMMMMM';s.style.cssText='position:absolute;visibility:hidden;white-space:pre';
+    term.appendChild(s);const cw=s.getBoundingClientRect().width/10;s.remove();
+    const cs=getComputedStyle(term),w=term.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+    if(cw>0&&window.ROC)ROC.cols=Math.floor(w/cw);
+  }
+  Term.measure=measure;measure();
+  let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{Term.refit();measure();},150);});
 })();
 
 /* ===== 輸入列 ===== */
@@ -296,7 +305,7 @@
   /* 字體大小：手機預設小一點，點「字」循環切換 */
   const sizes=[11,12,13,14,16,18];
   let fs=+ls.get('roc.fs')||(innerWidth<700?13:16);
-  const setFs=v=>{fs=v;document.documentElement.style.setProperty('--fs',v+'px');ls.set('roc.fs',v);Term.refit&&Term.refit();};
+  const setFs=v=>{fs=v;document.documentElement.style.setProperty('--fs',v+'px');ls.set('roc.fs',v);Term.refit&&Term.refit();Term.measure&&Term.measure();};
   setFs(fs);
   document.getElementById('bFont').onclick=()=>{const i=sizes.indexOf(fs);setFs(sizes[(i+1)%sizes.length]);Term.write('\x1b[1;30m[字體 '+fs+'px]\x1b[m\n');};
   /* 「⋯」展開匯出／匯入／模擬 */
@@ -317,8 +326,9 @@
 
 /* ===== 載入器 ===== */
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
+Term.measure();
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261020l';
+const V='20261020n';
 /* async=false：同時下載、依插入順序執行 */
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){

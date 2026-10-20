@@ -52,8 +52,24 @@ R.width=s=>{let w=0;for(const ch of R.strip(s))w+=ch.charCodeAt(0)>0x2e80?2:1;re
 R.pad=(s,n)=>{s=String(s);const w=R.width(s);return w>=n?s:s+' '.repeat(n-w);};
 R.padL=(s,n)=>{s=String(s);const w=R.width(s);return w>=n?s:' '.repeat(n-w)+s;};
 R.nl=s=>String(s).replace(/\r/g,'');
+/* 手機窄螢幕：原版文字在約 76 格處硬換行，畫面窄時會變成一長一短。
+   R.cols 由介面依終端機寬度設定；窄的時候把同一段的硬換行接回去，交給畫面自己折行 */
+R.narrow=()=>!!R.cols&&R.cols<70;
+R.reflow=s=>{
+  const L=String(s).split('\n'),out=[];
+  for(const l of L){
+    const p=out.length-1,prev=p>=0?out[p]:null;
+    const join=prev!==null&&l&&!/^[\s　]/.test(l)&&R.width(prev.split('\n').pop())>=56&&!/ {3,}|[─│┌┐└┘═║]/.test(prev+l);
+    if(join)out[p]=prev+l;else out.push(l);
+  }
+  return out.join('\n');
+};
+R.fit=s=>R.narrow()?R.reflow(s):s;
 /* EXP_PER_LEVEL（merc.h） */
 R.expPer=l=>l<28?1000:({28:1050,29:1100,30:1200,31:1300,32:1450,33:1600,34:1800,35:2100,36:4000,37:6300,38:12000,39:19200,40:28000})[l]||(l<43?29000:0);
+/* 網頁版「簡易模式」：預設開啟，降低新手門檻；指令 easy 可關掉（act 加 HARDCORE＝照原版） */
+R.EASY={gold:40000,prac:20,practiceLv:1,learnMul:2,levelPrac:2,expMul:1.5};
+R.easy=ch=>!!ch&&!ch.npc&&!ch.act.has('HARDCORE');
 R.expNext=ch=>R.expPer(ch.level)*(ch.level+1);
 R.hash=async s=>{
   try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('roc:'+s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
