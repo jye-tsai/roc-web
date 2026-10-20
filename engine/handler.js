@@ -58,6 +58,13 @@ R.canCarryW=ch=>ch.npc?100000:R.stat(ch,0)*15+ch.level*10+50;  /* 推測：原�
 R.carryN=ch=>ch.carrying.filter(o=>o.wear_loc<0).length;
 R.objWeight=o=>o.weight+o.contains.reduce((s,c)=>s+R.objWeight(c),0);
 R.carryW=ch=>ch.carrying.reduce((s,o)=>s+R.objWeight(o),0);
+/* str_app（const.c）：[tohit,todam,carry,wield,wield2,twohand] */
+R.STR_APP=[[-60,-5,0,0,0,0],[-50,-5,3,1,0,2],[-40,-4,3,2,1,4],[-30,-3,10,3,1,5],[-25,-2,25,4,2,6],[-20,-1,55,5,2,8],[-15,-1,80,6,3,9],[-10,0,100,7,4,11],
+  [0,0,150,8,5,12],[10,0,200,9,6,14],[20,1,250,10,7,15],[25,1,300,15,8,25],[30,2,350,20,9,30],[35,2,400,25,10,38],[40,3,430,30,15,45],[45,4,460,35,20,55],
+  [50,5,500,40,25,65],[55,6,550,45,30,75],[60,7,600,50,35,85],[65,8,650,55,40,95],[70,10,700,60,45,100],[75,12,750,65,50,120],[80,14,800,70,55,130],[85,16,850,75,60,140],
+  [90,18,900,80,65,150],[100,21,999,90,70,160],[110,23,1100,100,75,180],[21,24,1200,110,85,200],[24,27,1300,120,95,230],[27,30,1400,130,105,260],[31,35,1600,150,115,300],[21,40,1200,999999,999999,999999]];
+/* 武器所需力量差（act_obj.c wear_obj／fight_hits.c multi_hit）：col 3 主手 4 副手 5 雙手；未含 powerblow */
+R.strDiff=(ch,o,col)=>{const w=R.objWeight(o);let m=0;for(;m<31;m++)if(R.STR_APP[m][col]>=w)break;return R.stat(ch,0)-m;};
 
 R.isImm=ch=>!ch.npc&&ch.level>=R.LEVEL_IMMORTAL;
 R.isAwake=ch=>ch.position>R.POS.SLEEPING;
@@ -92,8 +99,8 @@ R.getObjWear=(ch,arg)=>find(ch.carrying,arg,ch,o=>o.wear_loc>=0);
 R.getObjHere=(ch,arg)=>find(ch.room.contents,arg,ch)||R.getObjCarry(ch,arg)||R.getObjWear(ch,arg);
 
 /* 武器類型（value[3]）→ 攻擊名稱 */
-R.attackName=ch=>{
-  const w=R.getEq(ch,16)||R.getEq(ch,19);
+R.attackName=(ch,wp)=>{
+  const w=wp||R.getEq(ch,16)||R.getEq(ch,19);
   if(w&&w.type==='WEAPON'){const a=R.CORE.attacks[w.values[3]];if(a)return a;}
   const r=R.CONST.races[ch.race];return r?r.dmg:'空手一擊';
 };

@@ -24,8 +24,7 @@ function thac0(ch){
   const c=R.CONST.classes[ch.cls]||{thac0_00:18,thac0_42:0};
   return c.thac0_00+Math.floor((c.thac0_42-c.thac0_00)*ch.level/42);
 }
-function weaponDam(ch){
-  const w=R.getEq(ch,16)||R.getEq(ch,19);
+function weaponDam(ch,w){
   let d;
   if(w&&w.values[1]>0&&w.values[2]>0)d=R.dice(w.values[1],w.values[2]);
   else if(ch.npc)d=R.rand(Math.floor(ch.level/2)+1,Math.floor(ch.level*3/2)+2);
@@ -34,17 +33,58 @@ function weaponDam(ch){
   if(w&&w.wear.has('TWO_HAND'))d=Math.floor(d*1.3);
   return Math.max(1,d);
 }
-/* multi_hit 的攻擊次數（fight_hits.c）：NPC 依等級，PC 依 second/third attack＋敏捷 */
-function attackChance(ch,sn,m){const l=R.getSkillLevel(ch,sn);return l*(l+6)+Math.floor(R.getSkillPercent(ch,sn)/m);}
-function nAttacks(ch){
-  let c1,c2;
-  if(ch.npc){c1=ch.level*4;c2=ch.level*2;}
-  else{const dex=R.stat(ch,3);c1=attackChance(ch,R.gsn.second_attack,2)+Math.max(0,(dex-10)*2);c2=attackChance(ch,R.gsn.third_attack,2)+Math.max(0,(dex-12)*2);}
-  let n=1;
-  if(R.pct()<c1){n++;if(R.pct()<c2)n++;}
-  if(ch.aff.has('HASTE'))n++;   /* 推測 */
-  return n;
+/* multi_hit 的攻擊次數（fight_hits.c） */
+const T=Math.trunc,inb=ch=>R.getSkillLevel(ch,R.gsn.inborn_ability);
+/* 對應 fight_hits.c GetAttackChance */
+function attackChance(ch,sn,m){
+  const l=R.getSkillLevel(ch,sn);let c=l*(l+6)+T(R.getSkillPercent(ch,sn)/m),i;
+  if(R.raceHas(ch,'BEHOLDER')){i=inb(ch);c+=10+i*(i+4);}
+  if(R.raceHas(ch,'WEREWOLF')){i=inb(ch);c+=15+i*i;}
+  if(R.raceHas(ch,'CENTAUR')&&!R.getEq(ch,16)&&!R.getEq(ch,18)&&!R.getEq(ch,19)){i=inb(ch);c+=5+T((i+2)*(i+1)/4);}
+  return c;
 }
+/* 對應 IsUsingKnightWeapon／IsUsingTrickyWeapon／IsUsingGunShot */
+const knightWp=(ch,w)=>R.getSkillLevel(ch,R.gsn.lance_mastery)>5?[1,2,3,7,9].includes(w.values[3]):w.values[3]===2;
+const trickyWp=(ch,w)=>R.getSkillLevel(ch,R.gsn.tricky_pacing)>4?[4,5,10,11,14].includes(w.values[3]):w.values[3]===11;
+function gunShot(ch,loc){
+  const w=R.getEq(ch,19)||R.getEq(ch,loc),a=R.getEq(ch,29);
+  return !!(w&&w.values[3]===16&&a&&a.type==='AMMO'&&(a.values[0]>0||a.values[0]===-1));
+}
+/* 對應 GetBonusedValue_LanceMaster／TrickyPacingBase */
+const masterBonus=(ch,sn)=>{const l=R.getSkillLevel(ch,sn);return T(100*(100+l*(l+4))*(1+R.getSkillPercent(ch,sn))/10000);};
+/* multi_hit 的 bonus_chance：騎士武器／詭步加成＋武器重量（簡化：沒有 notify 設定，視同原版預設開啟，太重一律提示） */
+function bonusChance(ch,w,col){
+  if(ch.npc||!w)return 100;
+  let b=100,sd=R.strDiff(ch,w,col);
+  const pb=R.gsn.powerblow,pl=R.getSkillLevel(ch,pb);
+  if(R.getSkillPercent(ch,pb)>0)sd+=T(pl*pl/6);
+  if(sd<-5)R.send(ch,C.CYN+(col===5?'你的雙手武器太重了！':col===4?'你的次要武器太重了！':'你的主要武器太重了！')+C.NOR+'\n');
+  if(R.getSkillPercent(ch,R.gsn.lance_mastery)>0&&knightWp(ch,w))b=masterBonus(ch,R.gsn.lance_mastery);
+  if(R.getSkillPercent(ch,R.gsn.tricky_pacing)>0&&trickyWp(ch,w))b=masterBonus(ch,R.gsn.tricky_pacing);
+  return b+(sd<0?Math.max(-4,sd)*15:Math.min(15,sd)*2);
+}
+/* 先擲出整輪攻擊（主手 1＋四次追加，dual 副手 1＋四次追加），回傳每下用的武器位置 */
+function rollAttacks(ch){
+  let c;
+  if(ch.npc){const l=ch.level,war=(ch.proto&&ch.proto.class||[]).includes('WARRIOR');c=[l*4,l*2,war?T(l/2)+T(l/4):0,war?T(l/3)+T(l/5):0];}
+  else{
+    const dex=R.stat(ch,3)+(R.raceHas(ch,'BEHOLDER')?5:0),G=R.gsn;
+    c=[attackChance(ch,G.second_attack,2)+Math.max(0,(dex-10)*2),attackChance(ch,G.third_attack,2)+Math.max(0,(dex-12)*2),
+       attackChance(ch,G.fourth_attack,3)+Math.max(0,(dex-15)*3),attackChance(ch,G.fifth_attack,4)+Math.max(0,(dex-18)*4)];
+  }
+  const two=R.getEq(ch,19),main=two||R.getEq(ch,16),list=[16];
+  let b=bonusChance(ch,main,two?5:3),gun=gunShot(ch,16)?40:0;
+  c.forEach((x,k)=>{if((k?gun:0)+R.pct()<T(x*b/100))list.push(16);});
+  const w2=R.getEq(ch,18);
+  if(w2&&w2.type==='WEAPON'&&(ch.npc?ch.act.has('TWO_WEAPON'):R.getSkillPercent(ch,R.gsn.dual))){   /* ACT_DUAL 在區域檔裡叫 TWO_WEAPON */
+    const dp=R.getSkillPercent(ch,R.gsn.dual)+R.getSkillLevel(ch,R.gsn.dual)*7;
+    list.push(18);b=bonusChance(ch,w2,4);gun=gunShot(ch,18)?40:0;
+    c.forEach((x,k)=>{if((k?gun:0)+R.pct()<T(x*b/100)&&R.pct()<=dp-k*10)list.push(18);});
+  }
+  return list;
+}
+/* 對應 fight_hits.c HitSleepCharm */
+const hitSleepCharm=(ch,v)=>!v||v.deleted||ch.deleted||v.aff.has('SLEEP')||ch.aff.has('SLEEP')||(v.aff.has('CHARM')&&v.master===ch)||(ch.aff.has('CHARM')&&ch.master===v);
 /* 防禦判定（fight_check.c，簡化：無 reposte／autocombat／fool／種族） */
 function checkParry(ch,v,ld){
   if(!R.isAwake(v))return false;
@@ -81,7 +121,7 @@ function checkBlock(ch,v,ld){
 R.checkDefense=function(ch,v){const ld=ch.level-v.level;return checkParry(ch,v,ld)||checkDodge(ch,v,ld)||checkBlock(ch,v,ld);};
 
 function damMessage(ch,v,dam,i,n){
-  const atk=R.attackName(ch);let tier=CORE.damage[CORE.damage.length-1][1];
+  const atk=R.attackName(ch,ch._wpn);let tier=CORE.damage[CORE.damage.length-1][1];
   for(const [m,t] of CORE.damage)if(dam<=m){tier=t;break;}
   const cnt=i+'/'+n;
   let y,t,r;
@@ -100,22 +140,30 @@ function damMessage(ch,v,dam,i,n){
   R.act(y+dd,ch,null,v,R.TO_CHAR);R.act(t,ch,null,v,R.TO_VICT);R.act(r,ch,null,v,R.TO_NOTVICT);
 }
 
-function oneHit(ch,v,i,n){
+function oneHit(ch,v,i,n,loc){
   if(v.deleted||ch.deleted||v.room!==ch.room||ch.position<P.FIGHTING&&ch.position!==P.STANDING)return;
+  const w=loc===18?R.getEq(ch,18):R.getEq(ch,16)||R.getEq(ch,19);ch._wpn=w;
+  try{
   const ac=Math.max(-15,Math.floor(v.armor/10));
   const roll=R.rand(0,19),need=thac0(ch)-ch.hitroll;
   if(roll===0||(roll!==19&&roll<need-ac)){damMessage(ch,v,-1,i,n);setFighting(ch,v);setFighting(v,ch);return;}
   if(R.checkDefense(ch,v)){setFighting(ch,v);setFighting(v,ch);return;}
-  let dam=weaponDam(ch);
+  let dam=weaponDam(ch,w);
   if(!R.isAwake(v))dam*=2;
   /* enhanced damage（fight_hits.c 2900） */
   if(!ch.npc){const s=R.gsn.enhanced_damage,l=R.getSkillLevel(ch,s);if(R.getSkillPercent(ch,s)&&R.getSkillPercent(ch,s)+l*5>R.pct())dam=dam*2+Math.floor(dam*l/4);}
   if(v.armor<0)dam=Math.max(0,dam-Math.floor(-v.armor/20));
   damage(ch,v,dam,i,n);
+  }finally{ch._wpn=null;}
 }
+/* 對應 fight_hits.c multi_hit（簡化：tactics 絆倒／繳械、protect、蜥蜴人能力、meteoric arrow 尚未移植） */
 R.multiHit=function(ch,v){
-  const n=nAttacks(ch);
-  for(let i=1;i<=n;i++){if(v.deleted||ch.fighting&&ch.fighting!==v)break;oneHit(ch,v,i,n);if(v.deleted||v.position===P.DEAD)break;}
+  const list=rollAttacks(ch),n=list.length;
+  for(let i=1;i<=n;i++){
+    if(v.deleted||ch.fighting&&ch.fighting!==v)break;
+    oneHit(ch,v,i,n,list[i-1]);
+    if(v.deleted||v.position===P.DEAD||!ch.fighting||ch.room!==v.room||hitSleepCharm(ch,v))break;
+  }
 };
 
 function damage(ch,v,dam,i,n,sn){
@@ -308,12 +356,36 @@ cmd.wimpy=function(ch,a){
   ch.wimpy=w;R.send(ch,'當生命低於 '+w+' 點時你會自動逃跑.\n');
 };
 
+/* 戰鬥中再生（對應 fight.c violence_update regeneracy 段） */
+function regeneracy(ch,v){
+  if(ch===v||ch.aff.has('NO_HEAL'))return;
+  if(ch.aff.has('POISON')&&!R.raceHas(ch,'NO_POISON')&&!R.hasSpecial(ch,'NO_POISON')&&R.getSvsType(ch,R.MAGIC.POISON)>ch.level)return;
+  const rr=R.raceHas(ch,'REGENERACY'),sk=R.gsn.regeneracy;
+  if(!rr&&!(ch.npc?ch.act.has('REGENERACY'):R.getSkillPercent(ch,sk)>0))return;
+  if(ch.npc){ch.hit=Math.min(ch.max_hit,ch.hit+ch.level*10);return;}
+  const sl=R.getSkillLevel(ch,sk),rs=inb(ch),d=v.level-Math.min(ch.level,36)+Math.max(0,sl-4)*2;
+  let con=R.stat(ch,4),base=R.getSkillPercent(ch,sk)+sl*2,reg=0;
+  if(rr){base+=10+rs*(rs+4);if(rs>3)con=Math.min(25,con+rs-3);reg+=rs*3;}
+  const f=(d>15?200:d>10?180:d>7?160:d>4?140:d>-2?100:d>-8?80:d>-10?50:d>-15?30:10)+sl*2;
+  if(sl>4)ch.move=Math.min(ch.max_move,ch.move+R.stat(ch,4)*sl);
+  if(ch.hit>=ch.max_hit)return;
+  reg+=sl*10;
+  const h=T(T(Math.max(1,con-10)*base*f/100)/(v.level-ch.level>5?4:5));
+  ch.hit=Math.min(ch.max_hit,ch.hit+(v.npc?h+T(ch.max_hit*5*reg/10000):T(h/8)+T(ch.max_hit*2*reg/10000)));
+}
 /* 戰鬥回合（每 PULSE_VIOLENCE） */
 R.violenceUpdate=function(){
   for(const ch of W.chars.concat(W.players)){
     const v=ch.fighting;if(!v||ch.deleted)continue;
     if(v.deleted||v.room!==ch.room){R.stopFighting(ch,false);continue;}
-    if(R.isAwake(ch)&&ch.position>=P.FIGHTING){R.multiHit(ch,v);if(R.MP&&!ch.deleted&&ch.fighting)R.MP.round(ch);}
+    regeneracy(ch,v);
+    if(R.isAwake(ch)&&ch.position>=P.FIGHTING){
+      /* 看不見時要靠 blind fight 才出手（fight.c violence_update check_blind） */
+      const blind=!(!ch.npc&&R.isImm(ch))&&ch.aff.has('BLIND');
+      if(blind)R.send(ch,'你什麼都看不到！\n');
+      if(!blind||R.getSkillPercent(ch,R.gsn.blind_fight)>R.pct())R.multiHit(ch,v);
+      if(R.MP&&!ch.deleted&&ch.fighting)R.MP.round(ch);
+    }
     else if(ch.position<P.FIGHTING&&ch.position>P.STUNNED)ch.position=P.FIGHTING;
   }
 };

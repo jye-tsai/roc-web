@@ -130,6 +130,7 @@ function wearObj(ch,o,fReplace,place){
     ['WEAR_WRIST',14,'你戴上 $p.','$n 戴上 $p.',15,'你雙手手腕都戴著東西.'],['WEAR_SHIELD',11,'你拿起 $p 作為盾牌.','$n 拿起 $p 作為盾牌.']];
   for(const [f,l,y,t,l2,full] of single){
     if(!want(f))continue;
+    if(f==='WEAR_SHIELD'&&!rm(18))return;
     if(f==='WEAR_SHIELD'&&eq(19)){R.send(ch,'你雙手握著雙手武器，無法再拿盾牌.\n');return;}
     if(!eq(l)){msg(y,t);R.equipChar(ch,o,l);return;}
     if(l2!==undefined&&!eq(l2)&&!(l2>=25&&l2<=28&&!ch.extraLimbs)){msg(y,t);R.equipChar(ch,o,l2);return;}
@@ -137,15 +138,27 @@ function wearObj(ch,o,fReplace,place){
     if(full&&!fReplace)R.send(ch,full+'\n');
     return;
   }
-  if(want('WIELD')){
-    if(eq(19)&&!rm(19))return;
-    if(!eq(16)){msg('你裝備 $p 作武器.','$n 裝備 $p 作武器.');R.equipChar(ch,o,16);return;}
-    if(fReplace&&rm(16)){msg('你裝備 $p 作武器.','$n 裝備 $p 作武器.');R.equipChar(ch,o,16);return;}
-    R.send(ch,'你雙手都握著武器了.\n');return;
+  if(want('WIELD')&&!R.raceHas(ch,'BEHOLDER')){
+    /* 對應 act_obj.c wear_obj：有 dual 先放主手、再放副手（副手與 hold／盾牌同位置） */
+    const wieldAt=(l,col)=>{
+      let sd=R.strDiff(ch,o,col);const pb=R.gsn.powerblow,pl=R.getSkillLevel(ch,pb);
+      if(R.getSkillPercent(ch,pb)>0)sd+=1+Math.floor(pl*pl/4);
+      msg('你裝備 $p 作武器.','$n 裝備 $p 作武器.');
+      if(sd<0)R.act(sd<-5?'太重了！你拿不動！':'$p 對你來說有點沉重.',ch,o,null,R.TO_CHAR);
+      R.equipChar(ch,o,l);
+    };
+    if(ch.npc||R.getSkillPercent(ch,R.gsn.dual)){
+      if(!rm(19)||eq(16)&&(eq(18)&&!rm(18)||!rm(17)||!rm(11))&&!rm(16))return;
+      if(!eq(16)){wieldAt(16,3);return;}
+      if(!eq(18)){wieldAt(18,4);return;}
+      R.send(ch,'你雙手都握著武器了.\n');return;
+    }
+    if(!rm(16)||!rm(19))return;
+    wieldAt(16,3);return;
   }
   if(want('HOLD')){
     if(eq(19)&&!rm(19))return;
-    if(!rm(17))return;msg('你握住 $p.','$n 握住 $p.');R.equipChar(ch,o,17);return;
+    if(!rm(18)||!rm(17))return;msg('你握住 $p.','$n 握住 $p.');R.equipChar(ch,o,17);return;
   }
   if(want('TWO_HAND')){
     if(!rm(16)||!rm(11)||!rm(17)||!rm(18)||!rm(19))return;

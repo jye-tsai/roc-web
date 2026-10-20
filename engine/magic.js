@@ -91,7 +91,11 @@ R.stopFollower=R.stopFollower||function(ch){const m=ch.master;if(!m)return;
   if(ch.room&&m.room&&R.canSee(m,ch))R.act('$n停止跟隨你。',ch,null,m,R.TO_VICT);R.act('你停止跟隨$N。',ch,null,m,R.TO_CHAR);
   ch.master=null;ch.leader=null;};
 R.hasSpecial=(ch,f)=>!!(ch.npc&&ch.proto&&(ch.proto.spec_flags||[]).includes(f));
-R.raceHas=(ch,abil)=>false;   /* 種族能力位元尚未對照，先一律否（推測） */
+/* 種族能力位元（include/parameters.h RACE_*） */
+R.RACE_BIT={PC_AVAIL:1,WATERBREATH:2,FLY:4,SWIM:8,WATERWALK:16,PASSDOOR:32,INFRAVISION:64,DETECT_ALIGN:128,DETECT_INVIS:256,DETECT_HIDDEN:512,
+  PROTECTION:1024,SANCT:2048,WEAPON_WIELD:4096,MUTE:8192,NO_POISON:16384,DETECT_MAGIC:32768,REGENERACY:65536,BEHOLDER:131072,LIZARDMAN:262144,
+  ORC:524288,VAMPIRE:1048576,INVIS:2097152,ANTI_MAGIC:4194304,UNDEAD:8388608,WEREWOLF:16777216,GARGOYLE:33554432,CENTAUR:67108864};
+R.raceHas=(ch,abil)=>{const r=R.CONST.races[ch.race];return !!(r&&((r.abil||0)&(R.RACE_BIT[abil]||0)));};
 
 /* ---------- affect ---------- */
 R.APPLY={NONE:'NONE',STR:'STR',DEX:'DEX',INT:'INT',WIS:'WIS',CON:'CON',SEX:'SEX',MANA:'MANA',HIT:'HIT',MOVE:'MOVE',AC:'AC',

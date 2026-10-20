@@ -53,6 +53,13 @@
     - 每次練習的進步加倍。
     - 升級拿到的練習點加倍。
     - 打怪經驗 ×1.5。
+11. **被動技能（第一批）**：依原版 `multi_hit` 和 `violence_update` 移植。
+    - 每回合最多 5 下，用 second 到 fifth attack 判定，敏捷也有加成。學了 dual 可以雙持武器，副手最多再打 5 下。
+    - lance mastery、tricky pacing 會依武器類型加成攻擊次數；武器太重會減少次數，也會有提示。
+    - 戰士型怪物（class 含 WARRIOR）也會有第四、五下攻擊；有 TWO_WEAPON 的怪物會用副手攻擊。
+    - regeneracy：戰鬥中每回合回血，技能等級 5 以上也會回移動力；有再生能力的種族和怪物同樣適用。
+    - blind fight：失明時沒有這個技能就無法出手。
+    - 種族能力位元照原版對照（飛行、免毒、聖光、眼魔、狼人等），影響相關的法術與判定。
 
 ## 還沒做／簡化的部分
 
@@ -70,7 +77,7 @@
 - 還缺的包括：word of recall、gate、mass heal、各種 breath、enchant 系列、elemental 系列、mana shield、polymorph other、resurrection 等。
 
 **技能**
-- 被動技能還沒有作用：fourth／fifth attack、fist fight、weapon master、armor mastery、regeneracy、blind fight、各武器攻擊熟練等。
+- 被動技能還沒有作用：fist fight、weapon master、armor mastery、evade、autoparry、deadly strike、reflexion、powerblow 傷害加成、各武器攻擊熟練等。戰鬥中的 tactics（絆倒、繳械）、蜥蜴人能力也還沒做。
 - 指令型技能還沒做：bash door、circle、assassination、pick lock、poison weapon、snare、meditate、bandage、throw、charge、twin、lead、invoke、dark raid、stone form 等。
 
 **其他玩家指令**
