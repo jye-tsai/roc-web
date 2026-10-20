@@ -551,4 +551,48 @@ R.ownerBoost=function(ch){
   ch.pc.ownerBoost=real;ch.hit=ch.max_hit;ch.mana=ch.max_mana;ch.move=ch.max_move;
   R.send(ch,R.C.HIY+'【站長】已補上 '+(real-1)+' 級的成長：生命 '+ch.max_hit+'、魔法 '+ch.max_mana+'、移動 '+ch.max_move+'。'+R.C.NOR+'\n');
 };
+
+/* ── bestgear（網頁版加的站長工具）：全站每個部位挑分數最高的裝備，載入並穿上 ──
+   分數是網頁版自訂的估算（不是原版公式）：命中×4、傷害×6、AC 每點 1.5、生命 0.5、魔法 0.3、移動 0.2、
+   五項屬性×8、閃避每點 1（負的較好）、減傷／加傷×2、豁免每點 1（負的較好）、PP×2；防具 v0×1.5；武器平均骰子傷害×4 */
+const GEAR_W={HITROLL:4,DAMROLL:6,AC:-1.5,HIT:.5,MANA:.3,MOVE:.2,STR:8,INT:8,WIS:8,DEX:8,CON:8,DODGE:-1,REDUCE_DAMAGE:2,REDUCE_MAGIC:2,
+  APPLY_ADAMAGE:2,APPLY_AMAGIC:2,POWER_POTENTIAL:2};
+R.gearScore=p=>{
+  let sc=0;
+  for(const a of p.applies||[]){const w=GEAR_W[a.type]??(/^SAVING_/.test(a.type)?-1:0);sc+=w*(+a.value||0);}
+  const v=(p.values||[]).map(x=>+x||0);
+  if(p.item_type==='ARMOR')sc+=v[0]*1.5;
+  if(p.item_type==='WEAPON')sc+=v[1]*(v[2]+1)/2*4;
+  return Math.round(sc);
+};
+/* 部位：[穿戴旗標, 位置們, 名稱]；戒指／頸／腕各兩個 */
+const GEAR_SLOTS=[['LIGHT',[0],'光源'],['WEAR_FINGER',[1,2],'手指'],['WEAR_NECK',[3,4],'頸部'],['WEAR_BODY',[5],'身體'],['WEAR_HEAD',[6],'頭部'],
+  ['WEAR_LEGS',[7],'腿部'],['WEAR_FEET',[8],'腳部'],['WEAR_HANDS',[9],'手部'],['WEAR_ARMS',[10],'手臂'],['WEAR_SHIELD',[11],'盾牌'],
+  ['WEAR_ABOUT',[12],'圍繞身體'],['WEAR_WAIST',[13],'腰部'],['WEAR_WRIST',[14,15],'腕部'],['WIELD',[16],'主要武器'],['HOLD',[17],'手握']];
+/* 一般模式排除：神之領域、幫會區域、PERSONAL／CLAN 專屬物品（all 模式全部算） */
+const godItem=p=>(p.area&&(p.area.id==='immhall'||/幫會/.test(p.area.name)))||(p.extra_flags||[]).some(f=>f==='PERSONAL'||f==='CLAN');
+const mainSlot=p=>p.item_type==='LIGHT'?'LIGHT':(p.wear_flags||[]).find(f=>f!=='TAKE');   /* 每件只算在第一個穿戴部位 */
+function bestFor(flag,n,all){
+  const ok=p=>mainSlot(p)===flag&&(flag!=='WIELD'||p.item_type==='WEAPON')&&(flag==='WIELD'||flag==='LIGHT'||p.item_type!=='WEAPON')
+    &&!(p.extra_flags||[]).includes('NOREMOVE')&&(all||!godItem(p));
+  return Object.values(W.objs).filter(ok).map(p=>[p,R.gearScore(p)]).sort((a,b)=>b[1]-a[1]).slice(0,n);
+}
+cmd.bestgear=function(ch,argument){
+  if(ch.npc||!R.isImm(ch)){R.send(ch,'什麼？\n');return;}
+  const a=R.lc(argument||''),listOnly=/\blist\b/.test(a),all=/\ball\b/.test(a);
+  let s=C.HIY+(listOnly?'全站各部位最強裝備（估算分數）':'自動換上全站最強裝備')+(all?'（含神之領域與幫會裝備）':'（不含神之領域與幫會裝備）')+'：'+C.NOR+'\n';
+  for(const [flag,locs,label] of GEAR_SLOTS){
+    const best=bestFor(flag,locs.length,all);
+    best.forEach(([p,sc],i)=>{
+      s+=R.pad(label,9)+R.strip(p.short_description||'')+' #'+p.vnum+' 分數 '+sc+' '+C.HIB+(p.area?p.area.name:'')+C.NOR+'\n';
+      if(listOnly)return;
+      const loc=locs[i],old=R.getEq(ch,loc);
+      if(old)R.unequipChar(ch,old);
+      const o=R.createObject(p,trust(ch));R.objToChar(o,ch);R.equipChar(ch,o,loc);
+    });
+  }
+  if(!listOnly)s+='（換下來的舊裝備放在身上；分數是網頁版估算，不是原版公式）\n';
+  R.send(ch,s);
+  if(!listOnly&&R.Save)R.Save.save(ch);
+};
 })(ROC);
