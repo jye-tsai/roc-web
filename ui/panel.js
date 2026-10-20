@@ -157,6 +157,68 @@ function renderLearn(ch){
   return h;
 }
 
+/* ---- 站長選單：imm 指令改用點的（技能設定、載入物品／怪物、傳送、角色數值） ---- */
+let immSub='quick',immQ='';
+const IMM_SUBS=[['quick','快捷'],['sk','技能'],['obj','物品'],['mob','怪物'],['room','傳送'],['me','角色']];
+const ql=s=>R.lc(R.strip(String(s||'')));
+function immList(ch){
+  const q=ql(immQ).trim(),W=R.world,hit=(p,txt)=>!q||String(p.vnum)===q||ql(txt).includes(q);
+  const more=n=>n>=60?'<div class="hint pad">只列前 60 筆，請打更多字縮小範圍。</div>':'';
+  let h='';
+  if(immSub==='sk'){
+    h+='<div class="pa pad0">'+btn('全部技能設 100','sset self all 100','warn')+btn('全部清成 0','sset self all 0')+'</div>';
+    const rows=[];
+    for(let sn=1;sn<SK().length;sn++){const s=SK()[sn];if(!s.name||s.name==='reserved'||!hit({vnum:-1},s.name+' '+s.cname))continue;rows.push(sn);}
+    rows.sort((a,b)=>(R.skillReqLevel(ch,a)===R.L_APP)-(R.skillReqLevel(ch,b)===R.L_APP));
+    for(const sn of rows){
+      const s=SK()[sn],k='im:'+sn,open=openKey===k,mx=R.skillMaxPercent(ch,sn),arg="'"+s.name+"'";
+      h+='<div class="it'+(open?' open':'')+'"><div class="ih" data-k="'+k+'"><span class="nm">'+esc(s.cname)+' <small>'+esc(s.name)+(R.skillReqLevel(ch,sn)===R.L_APP?' · 非本職業':'')+'</small></span><span class="tg">'+pctOf(ch,sn)+'%</span></div>';
+      if(open)h+='<div class="ia">'+[0,50,85,100].map(v=>btn('設 '+v,'sset self '+arg+' '+v,v===100?'pri':'')).join('')+(mx&&![0,50,85,100].includes(mx)?btn('本職上限 '+mx,'sset self '+arg+' '+mx,'pri'):'')+btnFill('自訂…','sset self '+arg+' ')+'</div>';
+      h+='</div>';
+    }
+    return h;
+  }
+  if(immSub==='obj'||immSub==='mob'){
+    const isO=immSub==='obj',list=Object.values(isO?W.objs:W.mobs).filter(p=>hit(p,p.short_description+' '+p.keywords+' '+(p.area&&p.area.name))).sort((a,b)=>(a.level||0)-(b.level||0)||a.vnum-b.vnum).slice(0,60);
+    if(!q)h+='<div class="hint pad">打名字（中英文都可）、區域名或編號搜尋。</div>';
+    for(const p of list){
+      const k='im'+immSub+':'+p.vnum,open=openKey===k;
+      h+='<div class="it'+(open?' open':'')+'"><div class="ih" data-k="'+k+'"><span class="nm">'+esc(R.strip(p.short_description||''))+' <small>#'+p.vnum+' · '+esc(p.area?p.area.name:'')+'</small></span><span class="tg">Lv'+(p.level||0)+(isO?' '+esc(p.item_type||''):'')+'</span></div>';
+      if(open)h+='<div class="ia">'+(isO?btn('載入','oload '+p.vnum,'pri')+btn('載入（我的等級）','oload '+p.vnum+' '+ch.level):btn('召喚到這裡','mload '+p.vnum,'pri'))+'</div>';
+      h+='</div>';
+    }
+    return h+more(list.length);
+  }
+  if(immSub==='room'){
+    if(!q){
+      h+='<div class="hint pad">打房間名、區域名或編號搜尋；下面是各區域入口。</div>';
+      for(const a of W.areas){const r=a.rooms[0];if(!r)continue;h+='<div class="it"><div class="ih" data-c="goto '+r.vnum+'"><span class="nm">'+esc(a.name)+' <small>#'+r.vnum+'</small></span><span class="tg">前往</span></div></div>';}
+      return h;
+    }
+    const list=Object.values(W.rooms).filter(r=>hit(r,r.name+' '+r.area.name)).slice(0,60);
+    for(const r of list)h+='<div class="it"><div class="ih" data-c="goto '+r.vnum+'"><span class="nm">'+esc(r.name)+' <small>#'+r.vnum+' · '+esc(r.area.name)+'</small></span><span class="tg">前往</span></div></div>';
+    return h+more(list.length);
+  }
+  if(immSub==='me'){
+    const f=(l,c)=>btnFill(l,'mset self '+c+' ');
+    h+='<div class="sec">數值（點了填進輸入列，補上數字送出）</div><div class="pa pad0">'
+      +f('金錢 '+ch.gold,'gold')+f('生命上限 '+ch.max_hit,'hp')+f('魔法上限 '+ch.max_mana,'mana')+f('移動上限 '+ch.max_move,'move')+f('練習點 '+ch.practice,'practice')+f('陣營 '+ch.alignment,'align')+'</div>'
+      +'<div class="sec">屬性（3～25）</div><div class="pa pad0">'+['str','int','wis','dex','con'].map((a,i)=>f(['力量','智力','智慧','敏捷','體質'][i]+' '+ch.perm[i],a)).join('')+'</div>'
+      +'<div class="sec">一鍵</div><div class="pa pad0">'+btn('金錢 +100 萬','mset self gold '+(ch.gold+1000000),'pri')+btn('練習點 1000','mset self practice 1000')+btn('屬性全 25',['str','int','wis','dex','con'].map(a=>'mset self '+a+' 25').join('||'))+'</div>';
+    return h;
+  }
+  /* 快捷 */
+  return '<div class="pa pad0">'+[['完全恢復','restore self'],['停止戰鬥','peace'],['全知視野','holylight'],['隱身','invis'],['清空房間','purge'],
+    ['房間資訊','rstat'],['我的資料','mstat self'],['線上名單','users'],['站長指令表','wizhelp'],['回城','recall']].map(([l,c])=>btn(l,c)).join('')
+    +btnFill('對全區廣播…','echo ')+btnFill('改等級（advance）…','advance self ')+btnFill('強制指令（force）…','force ')+'</div>';
+}
+function renderImm(ch){
+  if(!R.isImm(ch))return '<div class="hint pad">只有站長可以用。</div>';
+  let h='<div class="subs">'+IMM_SUBS.map(([k,l])=>'<button data-isub="'+k+'"'+(immSub===k?' class="cur"':'')+'>'+l+'</button>').join('')+'</div>';
+  if(['sk','obj','mob','room'].includes(immSub))h+='<div class="top"><input id="immq" placeholder="搜尋…" value="'+esc(immQ)+'" autocomplete="off"></div>';
+  return h+'<div id="immres">'+immList(ch)+'</div>';
+}
+
 /* ---- 快捷列（釘選的技能／法術／藥水，每個角色各自記住） ---- */
 const pinKey=ch=>'roc.pins.'+R.lc(ch.name);
 function getPins(ch){try{return JSON.parse(localStorage.getItem(pinKey(ch))||'[]');}catch(e){return [];}}
@@ -366,7 +428,7 @@ function renderChoices(){
       break;}
     case 'GET_OLD_PASSWORD':case 'OWNER_PASSWORD':case 'GET_NEW_PASSWORD':case 'CONFIRM_NEW_PASSWORD':
       h='<span class="hint">在下方輸入密碼（至少 5 個字）</span>'
-        +(st==='OWNER_PASSWORD'||st==='GET_NEW_PASSWORD'?'':'<button data-act="rem">'+(d.remember===false?'☐':'☑')+' 記住密碼</button>');break;
+        +(st==='GET_NEW_PASSWORD'?'':'<button data-act="rem">'+(d.remember===false?'☐':'☑')+' 記住密碼</button>');break;
     case 'CONFIRM_NEW_NAME':case 'CONFIRM_NEW_RACE':case 'CONFIRM_CLASS':h=yn;break;
     case 'DISPLAY_RACE':case 'DISPLAY_CLASS':case 'READ_MOTD':h='<button data-raw="" class="pri wide1">繼續 ▶</button>';break;
     case 'GET_NEW_RACE':
@@ -710,10 +772,12 @@ function renderSheet(){
   const sh=$('sheet');if(!sh.classList.contains('on'))return;
   const ch=me();
   for(const b of sh.querySelectorAll('.tabs button'))b.classList.toggle('cur',b.dataset.tab===tab);
+  const it=sh.querySelector('.tabs [data-tab="imm"]');if(it)it.style.display=ch&&R.isImm(ch)?'':'none';
   const body=sh.querySelector('.body');
   if(!ch||!ch.room){body.innerHTML='<div class="hint pad">進入遊戲後才能使用。</div>';return;}
+  if(tab==='imm'&&document.activeElement&&document.activeElement.id==='immq')return;   /* 打字搜尋中不要整頁重畫 */
   const st=body.scrollTop;
-  body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):tab==='sk'?renderSkills(ch):tab==='cmd'?renderCmds(ch):tab==='learn'?renderLearn(ch):renderRoom(ch);
+  body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):tab==='sk'?renderSkills(ch):tab==='cmd'?renderCmds(ch):tab==='learn'?renderLearn(ch):tab==='imm'?renderImm(ch):renderRoom(ch);
   body.scrollTop=st;
 }
 function openSheet(t){
@@ -729,9 +793,11 @@ function init(){
   const sh=$('sheet');
   sh.addEventListener('click',e=>{
     const b=e.target.closest('button,.ih');if(!b)return;
+    if(b.dataset.isub){immSub=b.dataset.isub;immQ='';openKey=null;renderSheet();return;}
     if(b.dataset.tab){tab=b.dataset.tab;openKey=giveFor=putFor=null;renderSheet();return;}
     if(b.dataset.close!==undefined){closeSheet();return;}
     if(b.dataset.k&&b.tagName==='BUTTON'){openKey=openKey===b.dataset.k?null:b.dataset.k;renderSheet();return;}
+    if(b.classList.contains('ih')&&b.dataset.c){send(b.dataset.c);return;}
     if(b.classList.contains('ih')){if(!b.dataset.k)return;openKey=openKey===b.dataset.k?null:b.dataset.k;giveFor=putFor=null;renderSheet();return;}
     if(b.dataset.give){giveFor=b.dataset.give;renderSheet();return;}
     if(b.dataset.put){putFor=b.dataset.put;renderSheet();return;}
@@ -744,7 +810,7 @@ function init(){
       setPins(ch,a);renderPins(true);renderSheet();}return;}
     if(b.dataset.back!==undefined){giveFor=putFor=null;renderSheet();return;}
     if(b.dataset.fill){window.UI.fill(b.dataset.fill);return;}
-    if(b.dataset.c){giveFor=putFor=null;send(b.dataset.c.replace(/^\u200b/,''));}
+    if(b.dataset.c){giveFor=putFor=null;for(const c of b.dataset.c.replace(/^\u200b/,'').split('||'))send(c);}   /* || 分隔可一次送多個指令 */
   });
   sh.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
   const pop=$('pop');
@@ -761,6 +827,7 @@ function init(){
     if(u.dataset.cmd){send(u.dataset.cmd);return;}
     if(u.dataset.kw)ctxMenu(u.dataset.kw,u.textContent);
   });
+  sh.addEventListener('input',e=>{if(e.target.id!=='immq')return;immQ=e.target.value;const ch=me(),r=$('immres');if(ch&&r)r.innerHTML=immList(ch);});
   $('stat').addEventListener('click',e=>{if(e.target.closest('.afs'))send('affect');});
   const chs=$('choices');
   chs.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});

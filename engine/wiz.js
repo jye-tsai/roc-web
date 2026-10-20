@@ -492,4 +492,52 @@ cmd.users=function(ch,argument){
   s+=count+' user'+(count===1?'':'s')+'\n';
   R.send(ch,s);
 };
+
+/* ── sset（act_wiz.c do_sset） ─────────────────────── */
+cmd.sset=function(ch,argument){
+  const [a1,r1]=R.one_arg(argument||''),[a2,r2]=R.one_arg(r1||''),[a3]=R.one_arg(r2||'');
+  if(!a1||!a2||!a3){R.send(ch,'Syntax: sset <victim> <skill> <value>\nor:     sset <victim> all     <value>\nSkill being any skill or spell.\n');return;}
+  let v=R.getCharWorld(ch,a1);
+  if(!v){R.send(ch,"They aren't here.\n");return;}
+  if(v.npc){R.send(ch,"Not on NPC's.\n");return;}
+  if(ch.level<=v.level&&ch!==v){R.send(ch,'You may not sset your peer nor your superior.\n');return;}
+  const fAll=R.lc(a2)==='all';let sn=0;
+  if(!fAll&&(sn=R.skillLookup(a2))<0){R.send(ch,'No such skill or spell.\n');return;}
+  if(!isNum(a3)){R.send(ch,'Value must be numeric.\n');return;}
+  const value=+a3;
+  if(value<0){R.send(ch,'Value range is 0 to 100.\n');return;}
+  v.pc.learned=v.pc.learned||{};
+  if(fAll){for(let k=1;k<R.SK.length;k++)if(R.SK[k].name&&R.SK[k].name!=='reserved')v.pc.learned[R.SK[k].name]=value;}   /* 簡化：原版 all 對已學技能保留技能等級，這裡直接設值 */
+  else v.pc.learned[R.SK[sn].name]=value;
+  R.Save&&R.Save.save(v);R.send(ch,'Ok.\n');
+};
+/* ── mset（act_wiz.c do_mset；簡化：只做數值欄位） ───── */
+cmd.mset=function(ch,argument){
+  const [a1,r1]=R.one_arg(argument||''),[a2,r2]=R.one_arg(r1||''),a3=(r2||'').trim();
+  if(!a1||!a2||!a3){R.send(ch,'Syntax: mset <victim> <field>  <value>\n\nField being one of:\n\t str int wis dex con sex level\n\t gold hp mana move practice align\n');return;}
+  const v=R.getCharWorld(ch,a1);
+  if(!v){R.send(ch,"They aren't here.\n");return;}
+  const n=isNum(a3)?+a3:-1,f=R.lc(a2),st={str:0,int:1,wis:2,dex:3,con:4}[f];
+  const bad=s=>{R.send(ch,s+'\n');};
+  if(st!==undefined){if(n<3||n>25)return bad(f+' range is 3 to 25.');v.perm[st]=n;}
+  else if(f==='sex'){if(n<0||n>2)return bad('Sex range is 0 to 2.');v.sex=n;}
+  else if(f==='level'){if(!v.npc)return bad("Not on PC's.");if(n<1||n>300)return bad('Level range is 1 to 300.');v.level=n;}
+  else if(f==='gold'){v.gold=Math.max(0,n);}
+  else if(f==='hp'){if(n<1||n>100000)return bad('Hp range is 1 to 100,000 hit points.');v.max_hit=n;}
+  else if(f==='mana'){if(n<1||n>100000)return bad('Mana range is 1 to 100,000 mana points.');v.max_mana=n;}
+  else if(f==='move'){if(n<1||n>100000)return bad('Move range is 1 to 100,000 move points.');v.max_move=n;}
+  else if(f==='practice'){if(n<0||n>1000)return bad('Practice range is 0 to 1000 sessions.');v.practice=n;}
+  else if(f==='align'){const a=parseInt(a3,10);if(isNaN(a)||a<-1000||a>1000)return bad('Alignment range is -1000 to 1000.');v.alignment=a;}
+  else return cmd.mset(ch,'');
+  if(!v.npc&&R.Save)R.Save.save(v);
+  R.send(ch,'Ok.\n');
+};
+/* 站長帳號一進來就是最高等級：補上 2～現在等級的升級成長（只補一次，不印每級訊息） */
+R.ownerBoost=function(ch){
+  if(ch.npc||ch.pc.ownerBoost)return;
+  const real=ch.level,send=R.send;R.send=()=>{};
+  try{for(let l=2;l<=real;l++)advanceLevel(ch);}finally{R.send=send;}
+  ch.pc.ownerBoost=real;ch.hit=ch.max_hit;ch.mana=ch.max_mana;ch.move=ch.max_move;
+  R.send(ch,R.C.HIY+'【站長】已補上 '+(real-1)+' 級的成長：生命 '+ch.max_hit+'、魔法 '+ch.max_mana+'、移動 '+ch.max_move+'。'+R.C.NOR+'\n');
+};
 })(ROC);

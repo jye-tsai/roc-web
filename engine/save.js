@@ -47,7 +47,7 @@ R.Save={
       gold:ch.gold,bank:ch.bank,exp:ch.exp,alignment:ch.alignment,practice:ch.practice,
       played:ch.played+Math.floor((Date.now()-ch.logon)/1000),act:[...ch.act],
       room:ch.room?(ch.room.flags.has('NO_SAVE')?R.ROOM_TEMPLE:ch.room.vnum):R.ROOM_TEMPLE,
-      objs:ch.carrying.map(objOut),saved:Date.now(),learned:ch.pc.learned||{},desc:ch.pc.description||undefined,
+      objs:ch.carrying.map(objOut),saved:Date.now(),learned:ch.pc.learned||{},desc:ch.pc.description||undefined,ob:ch.pc.ownerBoost||undefined,
       qmarks:R.MP?R.MP.qSave(ch):undefined,resp:ch.resp||undefined,skexp:ch.skexp||undefined,
       affects:(ch.affects||[]).filter(a=>!a.deleted).map(a=>({s:R.skillName(a.type),d:a.duration,l:a.location,m:a.modifier,b:a.bitvector}))};
     /* 裝備加成先卸再存，基礎值才正確 */
@@ -71,7 +71,7 @@ R.Save={
       const o=objIn(od);if(!o)continue;R.objToChar(o,ch);
       if(od.w>=0)R.equipChar(ch,o,od.w);
     }
-    ch.pc.learned=d.learned||{};if(d.desc)ch.pc.description=d.desc;
+    ch.pc.learned=d.learned||{};if(d.desc)ch.pc.description=d.desc;if(d.ob)ch.pc.ownerBoost=d.ob;
     if(R.MP)R.MP.qLoad(ch,d.qmarks);ch.resp=d.resp||0;ch.skexp=d.skexp||0;
     for(const a of d.affects||[]){const sn=R.skillLookup(a.s);if(sn>0)R.affectToChar(ch,{type:sn,duration:a.d,location:a.l,modifier:a.m,bitvector:a.b});}
     return ch;

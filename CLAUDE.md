@@ -38,6 +38,8 @@ ROC（混沌幻世）中文 MUD 的瀏覽器單機版。純前端、沒有建置
 - **簡易模式**：設定在 `R.EASY`；`R.easy(ch)` 只要角色的 act 沒有 HARDCORE 就是開啟。
   - 調整難度只改這組常數，不要改到原版公式本身。
 - **組隊**：`ch.group={leader,name,members}`；判斷是否同隊一律用 `R.isSameGroup`。
+- **站長選單**：`renderImm`、`immList` 在 `ui/panel.js`，只有 `R.isImm(ch)` 的角色看得到。
+  - 按鈕的 `data-c` 可以用 `||` 分隔，一次送出多個指令。
 - **UI**：`ui/panel.js`。
   - 快捷鍵：平常模式用 `normalKeys(ch)` 依情境產生按鈕；戰鬥模式在 `renderCombatKeys`；方向鍵狀態在 `renderDir`。
   - 指令總表在 `CMD_CAT`。
