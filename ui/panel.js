@@ -469,6 +469,7 @@ function renderChoices(){
       if(names.length)h='<span class="hint">選擇角色，或在下方輸入新名字：</span>'+names.map(n=>'<button data-raw="'+esc(n)+'" class="pri">'+(R.remember.get(n)?'⚡':'')+esc(n)+'</button>').join('')
         +(R.remember.any()?'<button data-act="forget"><small>忘掉記住的密碼</small></button>':'');
       else h='<span class="hint">在下方輸入英文名字（3~12 個字母）建立新角色</span>';
+      h+='<button data-act="remote">🌐 連線到實體站台</button>';
       break;}
     case 'GET_OLD_PASSWORD':case 'OWNER_PASSWORD':case 'GET_NEW_PASSWORD':case 'CONFIRM_NEW_PASSWORD':
       h='<span class="hint">在下方輸入密碼（至少 5 個字）</span>'
@@ -880,6 +881,7 @@ function init(){
     if(b.dataset.act){const d=Conn.desc;
       if(b.dataset.act==='rem'&&d)d.remember=d.remember===false;
       if(b.dataset.act==='forget')R.remember.clear();
+      if(b.dataset.act==='remote'){location.href=location.pathname+'?remote';return;}
       lastCh='';renderChoices();return;}
     if(b.dataset.raw!==undefined)window.UI.raw(b.dataset.raw);});
   Term.linkify=linkify;

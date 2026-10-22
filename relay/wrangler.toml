@@ -1,0 +1,8 @@
+name = "roc-relay"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+[vars]
+MUD_HOST = "roc.csie.org"
+MUD_PORT = "5555"
+ALLOW_ORIGIN = "https://jye-tsai.github.io,http://localhost:8765"

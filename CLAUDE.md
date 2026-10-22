@@ -40,6 +40,9 @@ ROC（混沌幻世）中文 MUD 的瀏覽器單機版。純前端、沒有建置
 - **組隊**：`ch.group={leader,name,members}`；判斷是否同隊一律用 `R.isSameGroup`。
 - **站長選單**：`renderImm`、`immList` 在 `ui/panel.js`，只有 `R.isImm(ch)` 的角色看得到。
   - 按鈕的 `data-c` 可以用 `||` 分隔，一次送出多個指令。
+- **連線版**：`?remote` 時載入器只載 `ui/remote.js`（不載 data 和 engine），透過 `relay/worker.js`（Cloudflare Worker）連到實體站台。
+  - `remote.js` 處理 telnet IAC、Big5／UTF-8 編碼、提示列解析。
+  - 本機測試可以寫一個假的 WebSocket 站台，用 `?remote&relay=ws://127.0.0.1:埠號` 連過去。
 - **UI**：`ui/panel.js`。
   - 快捷鍵：平常模式用 `normalKeys(ch)` 依情境產生按鈕；戰鬥模式在 `renderCombatKeys`；方向鍵狀態在 `renderDir`。
   - 指令總表在 `CMD_CAT`。
