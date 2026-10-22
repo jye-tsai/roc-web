@@ -103,12 +103,16 @@ function connect(){
     if(!url)return Term.write('\x1b[1;33m沒有轉接器網址，無法連線。\x1b[m\n');
     ls.set('roc.relay',url);
   }
-  url=url.trim().replace(/^http/,'ws');
+  /* 網址整理：沒寫開頭就補 wss://、https→wss（手機常自動把第一個字母變大寫） */
+  url=url.trim().replace(/\/+$/,'');
+  if(/^https?:\/\//i.test(url))url=url.replace(/^http/i,'ws');else if(!/^wss?:\/\//i.test(url))url='wss://'+url;
+  url=url.replace(/^wss?/i,m=>m.toLowerCase());
   Term.write('\x1b[1;30m連線到 '+url+' …\x1b[m\n');
   closedByUser=false;tstate=0;enc=ls.get('roc.enc')||'auto';makeDecoder();
   ws=new WebSocket(url);ws.binaryType='arraybuffer';
-  ws.onopen=()=>{Term.write('\x1b[1;32m[已連上站台]\x1b[m\n');setState(true);};
+  ws.onopen=()=>{Term.write('\x1b[1;32m[已連上轉接器，等待站台回應…]\x1b[m\n');setState(true);};
   ws.onmessage=e=>{
+    if(typeof e.data==='string'&&e.data.startsWith('\0relay:')){Term.write('\x1b[1;30m[轉接器] '+e.data.slice(7)+'\x1b[m\n');return;}
     const raw=typeof e.data==='string'?new TextEncoder().encode(e.data):new Uint8Array(e.data);
     const txt=decode(telnet(raw));
     if(txt){Term.write(txt);parsePrompt(txt);}
