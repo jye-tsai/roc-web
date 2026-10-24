@@ -635,7 +635,7 @@ function renderCmds(ch){
 /* ---- 平常模式：固定 4 顆，其他按鈕「遇到才出現」 ---- */
 const kwOf=v=>{const m=R.strip(R.PERS(v,me())).match(/\(([^()]+)\)\s*$/);return m?m[1]:R.lc(v.name).split(' ')[0];};
 function normalKeys(ch){
-  const bs=[['物品','@inv',''],['狀態','score',''],['技能','@sk',''],['指令…','@cmd','']];
+  const bs=[['物品','@inv',''],['狀態','score',''],['技能','@sk',''],['地圖','@map',''],['指令…','@cmd','']];
   if(!ch||!ch.room)return bs;
   const home=R.getRoom(ch.room.area.recall)||R.getRoom(R.ROOM_TEMPLE);
   if(ch.room!==home)bs.push(['回城','recall','']);
@@ -825,7 +825,51 @@ function renderSheet(){
   body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):tab==='sk'?renderSkills(ch):tab==='cmd'?renderCmds(ch):tab==='learn'?renderLearn(ch):tab==='imm'?renderImm(ch):renderRoom(ch);
   body.scrollTop=st;
 }
+/* ---- 地圖：疊在遊戲上的 iframe（map.html?embed），互傳位置與路線 ---- */
+let mapFrame=null,mapRoom=null;
+function openMap(){
+  const ch=me();if(!ch||!ch.room)return;
+  if(!mapFrame){
+    mapFrame=document.createElement('iframe');mapFrame.id='mapframe';mapFrame.src='map.html?embed&v='+(window.V||'');
+    document.body.appendChild(mapFrame);
+  }
+  mapFrame.classList.add('on');mapRoom=null;postPos(true);
+}
+function closeMap(){if(mapFrame)mapFrame.classList.remove('on');}
+function postPos(focus){
+  const ch=me();if(!mapFrame||!ch||!ch.room)return;
+  if(!focus&&mapRoom===ch.room.vnum)return;mapRoom=ch.room.vnum;
+  mapFrame.contentWindow&&mapFrame.contentWindow.postMessage({roc:'game',type:'pos',room:ch.room.vnum,focus:!!focus},location.origin);
+}
+/* 照路線走：一步一步送方向；關著的門先開；戰鬥、鎖門、走錯房間就停 */
+let walking=null;
+function walk(path,dirs){
+  if(walking)clearTimeout(walking.t);
+  let i=0,retry=0;
+  const say=t=>Term.write('\x1b[1;36m[自動走路] '+t+'\x1b[m\n');
+  const stop=t=>{walking=null;say(t);};
+  const step=()=>{
+    const ch=me();if(!ch||!ch.room)return stop('中斷');
+    if(ch.fighting)return stop('遇到戰鬥，停下來了。');
+    if(ch.room.vnum!==path[i]){if(retry++<6){walking.t=setTimeout(step,250);return;}return stop('走到的房間跟路線不一樣，停下來了。');}
+    retry=0;
+    if(i>=dirs.length)return stop('到了！');
+    const d=dirs[i],e=ch.room.exits[d];
+    if(e&&e.closed){if(e.locked)return stop(R.DIR_NAME[d]+'邊的門鎖住了。');send('open '+R.DIRS[d]);walking.t=setTimeout(step,300);return;}
+    if(ch.move<=0)return stop('移動力不夠了，先休息一下。');
+    send(R.DIRS[d]);i++;walking.t=setTimeout(step,350);
+  };
+  say('出發，共 '+dirs.length+' 步。');walking={t:setTimeout(step,100)};
+}
+addEventListener('message',e=>{
+  if(e.origin!==location.origin||!e.data||e.data.roc!=='map')return;
+  if(e.data.type==='ready')postPos(true);
+  if(e.data.type==='close')closeMap();
+  if(e.data.type==='walk'){closeMap();walk(e.data.path,e.data.dirs);}
+});
+
 function openSheet(t){
+  if(t==='map'){openMap();return;}
   if(t==='kill'){killMenu();return;}
   const sh=$('sheet');
   if(sh.classList.contains('on')&&tab===t){closeSheet();return;}
@@ -892,7 +936,7 @@ function init(){
   let q=false;
   const w=Term.write;
   Term.write=function(s){w.call(Term,s);if(!q){q=true;requestAnimationFrame(()=>{q=false;renderStat();renderPins();renderChoices();renderCombatKeys();renderSheet();});}};
-  setInterval(()=>{renderStat();renderPins();renderCombatKeys();},1000);
+  setInterval(()=>{renderStat();renderPins();renderCombatKeys();if(mapFrame&&mapFrame.classList.contains('on'))postPos(false);},1000);
 }
 window.UIPanel={open:openSheet,close:closeSheet,init,ctx:kw=>ctxMenu(kw,kw)};
 })(ROC);

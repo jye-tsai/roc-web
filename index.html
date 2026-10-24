@@ -89,6 +89,8 @@
   #sheet .hint{color:#777;font-size:13px;width:100%}
   #sheet .top .hint{width:auto;flex:1;text-align:right}
   #sheet .pad{padding:16px}
+  #mapframe{position:fixed;inset:0;width:100%;height:100%;border:0;z-index:50;background:#0b0b0b;display:none}
+  #mapframe.on{display:block}
   #sheet .pad0{padding:8px 10px;flex-wrap:wrap;display:flex;gap:6px}
   #sheet .subs{display:flex;overflow-x:auto;border-bottom:1px solid #222;background:#0e0e0e}
   #sheet .subs button{flex:1 0 auto;border:0;border-radius:0;background:none;color:#888;padding:8px 10px}
@@ -339,7 +341,7 @@
 window.ROC={areaData:[],loadArea(a){this.areaData.push(a);}};
 Term.measure();
 /* 改版時換這個號碼，手機才不會一直用舊的程式快取 */
-const V='20261022b';
+const V='20261024a';window.V=V;
 /* async=false：同時下載、依插入順序執行 */
 function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=ok;s.onerror=()=>ng(src);document.head.appendChild(s);});}
 (async function(){

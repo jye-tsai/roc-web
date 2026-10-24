@@ -36,7 +36,7 @@
 </head>
 <body>
 <canvas id="cv"></canvas>
-<div id="top"><b>混沌幻世地圖</b><input id="q" placeholder="搜尋房間、區域、怪物、物品…" autocomplete="off"><button id="bAll">全圖</button></div>
+<div id="top"><b>混沌幻世地圖</b><input id="q" placeholder="搜尋房間、區域、怪物、物品…" autocomplete="off"><button id="bMe" style="display:none">我在哪</button><button id="bAll">全圖</button><button id="bClose" style="display:none" class="pri">✕ 回遊戲</button></div>
 <div id="res"></div>
 <div id="card"></div>
 <div id="legend">等級<i style="background:#3a7"></i>1-10<i style="background:#3aa"></i>11-20<i style="background:#aa3"></i>21-30<i style="background:#c73"></i>31-38<i style="background:#c44"></i>39+</div>
@@ -46,7 +46,7 @@
    縮小看世界總圖（區域塊＋跨區連線），放大看房間；點房間看資訊卡、規劃路線 */
 (async function(){
 const cv=document.getElementById('cv'),cx=cv.getContext('2d'),$=id=>document.getElementById(id);
-const M=await (await fetch('map/map.json?v=20261024b')).json();
+const M=await (await fetch('map/map.json?v=20261024c')).json();
 const A=M.areas,RM=M.rooms,IDX={};RM.forEach((r,i)=>IDX[r[0]]=i);
 const DN=['北','東','南','西','上','下'],DC=['n','e','s','w','u','d'],DV=[[0,-1],[1,0],[0,1],[-1,0]];
 const FLAGN={DARK:'黑暗',SAFE:'安全區',NO_RECALL:'禁止回城',PK:'PK 區',NO_MOB:'怪物不進',INDOORS:'室內',UNDERGROUND:'地下',PRIVATE:'私人',PET_SHOP:'寵物店'};
@@ -67,6 +67,9 @@ for(const r of RM)for(const [d,t] of r[7]){const j=IDX[t];if(j===undefined)conti
 
 /* ---- 視角：world→screen = w*s+t ---- */
 let W=0,H=0,dpr=1,s=1,tx=0,ty=0,sel=null,hits=new Set(),route=null,from=null;
+/* 嵌入遊戲（index.html 用 iframe 開 map.html?embed）：遊戲送來目前位置，地圖送回要走的路線 */
+const EMBED=new URLSearchParams(location.search).has('embed');let me=null;
+const toGame=m=>{if(EMBED&&parent!==window)parent.postMessage(Object.assign({roc:'map'},m),location.origin);};
 function resize(){dpr=window.devicePixelRatio||1;W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;draw();}
 function bounds(){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const a of A){x0=Math.min(x0,a.x);y0=Math.min(y0,a.y);x1=Math.max(x1,a.x+a.w);y1=Math.max(y1,a.y+a.h);}return [x0,y0,x1,y1];}
 function fit(x0,y0,x1,y1,anim){const pad=40,top=56;const ns=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2-top)/Math.max(1,y1-y0));flyTo((x0+x1)/2,(y0+y1)/2,Math.min(ns,60),anim);}
@@ -155,6 +158,8 @@ function render(){
   }
   /* 路線 */
   if(route&&route.length>1){cx.strokeStyle='#fa5';cx.lineWidth=Math.max(2,s*.12);cx.beginPath();route.forEach((v,i)=>{const r=RM[IDX[v]];const px=X(r[2]+.5),py=Y(r[3]+.5);i?cx.lineTo(px,py):cx.moveTo(px,py);});cx.stroke();}
+  if(me!==null){const r=RM[IDX[me]];if(r){const px=X(r[2]+.5),py=Y(r[3]+.5),rr=Math.max(6,s*.45);cx.fillStyle='#39f';cx.strokeStyle='#fff';cx.lineWidth=2;cx.beginPath();cx.arc(px,py,rr,0,7);cx.fill();cx.stroke();
+    if(s<3.5){cx.font='bold 13px sans-serif';cx.fillStyle='#9cf';cx.fillText('你在這裡',px+rr+3,py+4);}}}
   if(sel!==null){const r=RM[IDX[sel]];if(r){cx.strokeStyle='#ff5';cx.lineWidth=3;const sz=Math.max(6,s*.8);cx.strokeRect(X(r[2]+.5)-sz/2,Y(r[3]+.5)-sz/2,sz,sz);}}
   /* 區域名稱（最後畫，蓋在上面） */
   cx.textBaseline='top';
@@ -213,7 +218,7 @@ async function openRoom(v){
   const ms=roomMobs[v]||[],os=roomObjs[v]||[];
   if(ms.length)h+='<div class="sec">怪物</div>'+ms.map(m=>{const x=M.mobs[m];return '<div class="li" data-mob="'+m+'"><span>'+esc(x[0])+'</span><small>Lv'+x[1]+' · 出現 '+x[2].length+' 處</small></div>';}).join('');
   if(os.length)h+='<div class="sec">物品</div>'+os.map(o=>{const x=M.objs[o];return '<div class="li" data-obj="'+o+'"><span>'+esc(x[0])+'</span><small>'+(x[1]?'Lv'+x[1]+' · ':'')+esc(x[2]||'')+'</small></div>';}).join('');
-  h+='<div class="sec">路線</div><div class="row"><button data-from="'+v+'"'+(from===v?' class="pri"':'')+'>'+(from===v?'★ 起點':'設為起點')+'</button>'
+  h+='<div class="sec">路線</div><div class="row">'+(EMBED&&me!==null&&me!==v?'<button class="pri" data-walk="'+v+'">🚶 從我這裡走過去</button>':'')+'<button data-from="'+v+'"'+(from===v?' class="pri"':'')+'>'+(from===v?'★ 起點':'設為起點')+'</button>'
     +(from!==null&&from!==v?'<button class="pri" data-to="'+v+'">從起點走到這裡</button>':'')+'<button data-copy="'+v+'">複製這裡的連結</button></div><div id="rt"></div>';
   h+='<div class="sec">描述</div><div class="desc" id="desc">載入中…</div>';
   card.innerHTML=h;card.classList.add('on');card.scrollTop=0;
@@ -232,7 +237,7 @@ function findRoute(a,b){
 }
 const runs=dirs=>{const out=[];for(const d of dirs){const l=out[out.length-1];if(l&&l[0]===d)l[1]++;else out.push([d,1]);}return out.map(([d,n])=>(n>1?n:'')+DC[d]).join(' ');};
 $('card').addEventListener('click',e=>{
-  const b=e.target.closest('[data-go],[data-mob],[data-obj],[data-from],[data-to],[data-copy],[data-x]');if(!b)return;
+  const b=e.target.closest('[data-go],[data-mob],[data-obj],[data-from],[data-to],[data-copy],[data-walk],[data-x]');if(!b)return;
   if(b.dataset.x!==undefined)return closeCard();
   if(b.dataset.go){const t=+b.dataset.go;openRoom(t);flyRoom(t);return;}
   if(b.dataset.mob){const m=M.mobs[b.dataset.mob];hits=new Set(m[2]);showList('「'+m[0]+'」出現的地方',m[2],m[3]);draw();return;}
@@ -243,8 +248,14 @@ $('card').addEventListener('click',e=>{
     route=R.path;draw();const w=runs(R.dirs);
     $('rt').innerHTML='<div class="route">'+R.dirs.length+' 步：'+esc(w)+'</div><div class="row"><button data-copyw="'+esc(w)+'">複製走法</button></div>';return;}
   if(b.dataset.copy){copy(location.origin+location.pathname+'#r='+b.dataset.copy);return;}
+  if(b.dataset.walk){const R=findRoute(me,+b.dataset.walk);
+    if(!R){$('rt').innerHTML='<div class="sub">走不到（可能要靠傳送或劇本）</div>';return;}
+    route=R.path;draw();toGame({type:'walk',path:R.path,dirs:R.dirs});return;}
 });
 $('card').addEventListener('click',e=>{const b=e.target.closest('[data-copyw]');if(b)copy(b.dataset.copyw);});
+/* 起點→終點算好的路線，嵌入時也能直接在遊戲裡走（要先站在起點） */
+$('card').addEventListener('click',e=>{const b=e.target.closest('[data-to]');if(!b||!EMBED||!route)return;
+  const R=findRoute(from,+b.dataset.to);if(R&&me===from)$('rt').insertAdjacentHTML('beforeend','<div class="row"><button class="pri" data-walk="'+b.dataset.to+'">🚶 在遊戲裡照著走</button></div>');});
 function copy(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('已複製'),()=>prompt('複製這段：',t));}
 let tt;function toast(t){const el=$('tip');el.textContent=t;el.style.display='block';clearTimeout(tt);tt=setTimeout(()=>el.style.display='none',1800);}
 
@@ -279,6 +290,16 @@ $('res').addEventListener('click',e=>{
 $('bAll').onclick=()=>{const b=bounds();fit(...b);closeCard();$('res').classList.remove('on');};
 
 addEventListener('resize',resize);resize();
+if(EMBED){
+  $('bClose').style.display='';$('bMe').style.display='';$('top').querySelector('b').style.display='none';
+  $('bClose').onclick=()=>toGame({type:'close'});
+  $('bMe').onclick=()=>{if(me!==null){flyRoom(me,30);openRoom(me);}};
+  addEventListener('message',e=>{
+    if(e.origin!==location.origin||!e.data||e.data.roc!=='game')return;
+    if(e.data.type==='pos'){const first=me===null;me=e.data.room;draw();if(first||e.data.focus){closeCard();flyRoom(me,30);}}
+  });
+  toGame({type:'ready'});
+}
 /* 網址 #r=3001 直接飛到那個房間 */
 const m=location.hash.match(/r=(\d+)/);
 if(m&&IDX[m[1]]!==undefined){const b=bounds();fit(...b,false);setTimeout(()=>{openRoom(+m[1]);flyRoom(+m[1],30);},300);}
