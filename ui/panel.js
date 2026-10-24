@@ -825,12 +825,12 @@ function renderSheet(){
   body.innerHTML=tab==='inv'?renderInv(ch):tab==='eq'?renderEq(ch):tab==='sk'?renderSkills(ch):tab==='cmd'?renderCmds(ch):tab==='learn'?renderLearn(ch):tab==='imm'?renderImm(ch):renderRoom(ch);
   body.scrollTop=st;
 }
-/* ---- 地圖：疊在遊戲上的 iframe（map.html?embed），互傳位置與路線 ---- */
+/* ---- 地圖：疊在遊戲上的 iframe（map/?embed），互傳位置與路線 ---- */
 let mapFrame=null,mapRoom=null;
 function openMap(){
   const ch=me();if(!ch||!ch.room)return;
   if(!mapFrame){
-    mapFrame=document.createElement('iframe');mapFrame.id='mapframe';mapFrame.src='map.html?embed&v='+(window.V||'');
+    mapFrame=document.createElement('iframe');mapFrame.id='mapframe';mapFrame.src='map/?embed&v='+(window.V||'');
     document.body.appendChild(mapFrame);
   }
   mapFrame.classList.add('on');mapRoom=null;postPos(true);

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>混沌幻世 全區地圖</title>
+<style>
+  :root{--bg:#0b0b0b;--fg:#ddd;--dim:#888;--line:#333;--acc:#ff5;--cy:#5ff}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:"Noto Sans Mono CJK TC","Sarasa Mono TC",Menlo,Consolas,monospace;overflow:hidden;-webkit-text-size-adjust:100%}
+  #cv{position:fixed;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+  #top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;padding:calc(6px + env(safe-area-inset-top)) 8px 6px;background:#111d;border-bottom:1px solid var(--line);z-index:3;align-items:center}
+  #top b{color:var(--acc);white-space:nowrap;font-size:15px}
+  #q{flex:1;min-width:0;background:#000;color:#fff;border:1px solid #444;border-radius:4px;padding:6px 8px;font:inherit;font-size:16px}
+  button{background:#222;color:#ccc;border:1px solid #444;border-radius:4px;padding:6px 10px;font:inherit;font-size:14px;cursor:pointer;touch-action:manipulation}
+  button.pri{color:#5f5;border-color:#363}
+  #res{position:fixed;left:8px;right:8px;top:calc(48px + env(safe-area-inset-top));max-height:50%;overflow-y:auto;background:#151515;border:1px solid #444;border-radius:6px;z-index:4;display:none}
+  #res.on{display:block}
+  #res div{padding:8px 10px;border-bottom:1px solid #222;cursor:pointer}
+  #res small{color:var(--dim)}
+  #res .k{color:var(--cy);font-size:12px;margin-right:6px}
+  #card{position:fixed;left:0;right:0;bottom:0;max-height:55%;overflow-y:auto;background:#151515;border-top:2px solid #555;z-index:4;padding:10px 12px calc(12px + env(safe-area-inset-bottom));box-sizing:border-box;display:none;font-size:14px;line-height:1.5}
+  #card.on{display:block}
+  #card h3{margin:0 0 2px;font-size:17px;color:#fff}
+  #card .sub{color:var(--dim);font-size:12px;margin-bottom:6px}
+  #card .sec{color:var(--acc);font-size:13px;margin:8px 0 4px}
+  #card .row{display:flex;flex-wrap:wrap;gap:6px}
+  #card .desc{white-space:pre-wrap;color:#bbb;font-size:13px;background:#0c0c0c;border-left:2px solid #444;padding:6px 8px}
+  #card .x{position:sticky;top:0;float:right;color:#f55}
+  #card .li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid #1e1e1e;cursor:pointer}
+  #card .li small{color:var(--dim);white-space:nowrap}
+  #card .route{color:#fa5;font-size:15px;word-break:break-all}
+  #legend{position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:2;background:#111c;border:1px solid var(--line);border-radius:4px;padding:4px 6px;font-size:11px;color:var(--dim);pointer-events:none}
+  #legend i{display:inline-block;width:9px;height:9px;margin:0 3px 0 8px;vertical-align:-1px}
+  #tip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(40px + env(safe-area-inset-bottom));background:#222e;border:1px solid #555;border-radius:4px;padding:4px 10px;font-size:13px;z-index:5;display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="top"><b>混沌幻世地圖</b><input id="q" placeholder="搜尋房間、區域、怪物、物品…" autocomplete="off"><button id="bMe" style="display:none">我在哪</button><button id="bAll">全圖</button><button id="bClose" style="display:none" class="pri">✕ 回遊戲</button></div>
+<div id="res"></div>
+<div id="card"></div>
+<div id="legend">等級<i style="background:#3a7"></i>1-10<i style="background:#3aa"></i>11-20<i style="background:#aa3"></i>21-30<i style="background:#c73"></i>31-38<i style="background:#c44"></i>39+</div>
+<div id="tip"></div>
+<script>
+/* map/index.html — 全區地圖（網址 roc-web/map/，不用登入）：資料由 map/build.js 產生（map/map.json），房間描述與重生細節點開時才從 data/areas 載入
+   縮小看世界總圖（區域塊＋跨區連線），放大看房間；點房間看資訊卡、規劃路線 */
+(async function(){
+const cv=document.getElementById('cv'),cx=cv.getContext('2d'),$=id=>document.getElementById(id);
+const M=await (await fetch('map.json?v=20261024d')).json();
+const A=M.areas,RM=M.rooms,IDX={};RM.forEach((r,i)=>IDX[r[0]]=i);
+const DN=['北','東','南','西','上','下'],DC=['n','e','s','w','u','d'],DV=[[0,-1],[1,0],[0,1],[-1,0]];
+const FLAGN={DARK:'黑暗',SAFE:'安全區',NO_RECALL:'禁止回城',PK:'PK 區',NO_MOB:'怪物不進',INDOORS:'室內',UNDERGROUND:'地下',PRIVATE:'私人',PET_SHOP:'寵物店'};
+const SECTN={INSIDE:'室內',CITY:'城市',FIELD:'原野',FOREST:'森林',HILLS:'丘陵',MOUNTAIN:'山地',WATER_SWIM:'淺水',WATER_NOSWIM:'深水',UNDERWATER:'水底',AIR:'空中',DESERT:'沙漠'};
+const lvColor=l=>!l?'#555555':l<=10?'#33aa77':l<=20?'#33aaaa':l<=30?'#aaaa33':l<=38?'#cc7733':'#cc4444';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const flagsOf=r=>M.flag.filter((f,i)=>r[6]&(1<<i));
+/* 房間所在的那一層（floors 裡 x 範圍）→ 同層才畫直線連線 */
+const floorOf=r=>{const a=A[r[1]],lx=r[2]-a.x,ly=r[3]-a.y;const f=a.floors.find(f=>lx>=f[1]&&lx<f[1]+f[3]&&ly>=f[2]&&ly<f[2]+f[4]);return f?f[0]:0;};
+const RF=RM.map(floorOf);
+/* 房間 → 怪物／物品（重生資料） */
+const roomMobs={},roomObjs={};
+for(const [v,m] of Object.entries(M.mobs))for(const r of m[2])(roomMobs[r]=roomMobs[r]||[]).push(+v);
+for(const [v,o] of Object.entries(M.objs))for(const r of o[3])(roomObjs[r]=roomObjs[r]||[]).push(+v);
+/* 跨區連線（畫世界總圖用）：區域對 → 一條 */
+const alinks=new Map();
+for(const r of RM)for(const [d,t] of r[7]){const j=IDX[t];if(j===undefined)continue;const b=RM[j][1];if(b===r[1])continue;const k=Math.min(r[1],b)+'-'+Math.max(r[1],b);if(!alinks.has(k))alinks.set(k,[r,RM[j]]);}
+
+/* ---- 視角：world→screen = w*s+t ---- */
+let W=0,H=0,dpr=1,s=1,tx=0,ty=0,sel=null,hits=new Set(),route=null,from=null;
+/* 嵌入遊戲（index.html 用 iframe 開 map/?embed）：遊戲送來目前位置，地圖送回要走的路線 */
+const EMBED=new URLSearchParams(location.search).has('embed');let me=null;
+const toGame=m=>{if(EMBED&&parent!==window)parent.postMessage(Object.assign({roc:'map'},m),location.origin);};
+function resize(){dpr=window.devicePixelRatio||1;W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;draw();}
+function bounds(){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const a of A){x0=Math.min(x0,a.x);y0=Math.min(y0,a.y);x1=Math.max(x1,a.x+a.w);y1=Math.max(y1,a.y+a.h);}return [x0,y0,x1,y1];}
+function fit(x0,y0,x1,y1,anim){const pad=40,top=56;const ns=Math.min((W-pad*2)/Math.max(1,x1-x0),(H-pad*2-top)/Math.max(1,y1-y0));flyTo((x0+x1)/2,(y0+y1)/2,Math.min(ns,60),anim);}
+let anim=null;
+/* 畫面中心：資訊卡打開時往上移（卡片蓋住下半部） */
+const cy0=()=>$('card').classList.contains('on')?(56+H*.45)/2:(H+56)/2;
+function flyTo(wx,wy,ns,a=true){
+  const CY=cy0(),tgt=[W/2-wx*ns,CY-wy*ns,ns];
+  if(!a){[tx,ty,s]=tgt;draw();return;}
+  const st=[tx,ty,s],t0=performance.now();
+  /* 用世界座標中心插值，縮放用對數插值，看起來比較順 */
+  const c0=[(W/2-tx)/s,(CY-ty)/s],c1=[wx,wy];
+  cancelAnimationFrame(anim);
+  const step=now=>{const k=Math.min(1,(now-t0)/450),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    const ss=Math.exp(Math.log(st[2])+(Math.log(ns)-Math.log(st[2]))*e),cxw=c0[0]+(c1[0]-c0[0])*e,cyw=c0[1]+(c1[1]-c0[1])*e;
+    s=ss;tx=W/2-cxw*s;ty=CY-cyw*s;draw();if(k<1)anim=requestAnimationFrame(step);};
+  anim=requestAnimationFrame(step);
+}
+const flyRoom=(v,z)=>{const r=RM[IDX[v]];if(r)flyTo(r[2]+.5,r[3]+.5,Math.max(s,z||28));};
+
+/* ---- 繪圖 ---- */
+let raf=0;function draw(){if(!raf)raf=requestAnimationFrame(()=>{raf=0;render();});}
+function render(){
+  cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle='#0b0b0b';cx.fillRect(0,0,W,H);
+  const vx0=-tx/s,vy0=-ty/s,vx1=(W-tx)/s,vy1=(H-ty)/s;
+  const X=x=>x*s+tx,Y=y=>y*s+ty;
+  const showRooms=s>=3.5;
+  /* 區域塊 */
+  for(const a of A){
+    if(a.x>vx1||a.x+a.w<vx0||a.y>vy1||a.y+a.h<vy0)continue;
+    const c=lvColor(a.lv);
+    cx.fillStyle=c+(showRooms?'18':'55');cx.strokeStyle=c;cx.lineWidth=1;
+    const p=.6;cx.fillRect(X(a.x-p),Y(a.y-p),(a.w+p*2)*s,(a.h+p*2)*s);cx.strokeRect(X(a.x-p),Y(a.y-p),(a.w+p*2)*s,(a.h+p*2)*s);
+    /* 多層：每層框起來並標層名 */
+    if(showRooms&&a.floors.length>1)for(const [z,fx,fy,fw,fh] of a.floors){
+      cx.strokeStyle='#555';cx.setLineDash([4,3]);cx.strokeRect(X(a.x+fx-.3),Y(a.y+fy-.3),(fw+.6)*s,(fh+.6)*s);cx.setLineDash([]);
+      if(s>8){cx.fillStyle='#999';cx.font=Math.min(14,s*.45)+'px sans-serif';cx.fillText(z>0?'上'+z+'層':z<0?'下'+(-z)+'層':'地面',X(a.x+fx),Y(a.y+fy-.45));}
+    }
+  }
+  /* 世界總圖：區域之間的連線 */
+  if(!showRooms){
+    cx.strokeStyle='#5ff6';cx.lineWidth=1;cx.beginPath();
+    for(const [ra,rb] of alinks.values()){cx.moveTo(X(ra[2]+.5),Y(ra[3]+.5));cx.lineTo(X(rb[2]+.5),Y(rb[3]+.5));}
+    cx.stroke();
+  }else{
+    /* 房間與出口 */
+    const sz=Math.max(2,s*.62),off=(1-.62)/2;
+    cx.lineWidth=Math.max(1,s*.06);
+    const seg=[],door=[],cross=[],oneway=[];
+    for(let i=0;i<RM.length;i++){
+      const r=RM[i],x=r[2],y=r[3];
+      if(x<vx0-2||x>vx1+1||y<vy0-2||y>vy1+1)continue;
+      for(const [d,t,f] of r[7]){
+        const j=IDX[t];if(j===undefined)continue;const q=RM[j];
+        if(d>=4)continue;
+        if(q[1]!==r[1]){cross.push([r,q]);continue;}
+        const adj=q[2]-x===DV[d][0]&&q[3]-y===DV[d][1]&&RF[j]===RF[i];
+        if(adj){if(t<r[0]&&!(f&4))continue;(f&4?oneway:seg).push([r,q,f]);}
+        else (f&4?oneway:seg).push([r,q,f,1]);   /* 排不到隔壁：畫斜線 */
+        if(f&1)door.push([r,q,d,f]);
+      }
+    }
+    const line=(list,col,dash)=>{cx.strokeStyle=col;cx.setLineDash(dash||[]);cx.beginPath();for(const [a,b] of list){cx.moveTo(X(a[2]+.5),Y(a[3]+.5));cx.lineTo(X(b[2]+.5),Y(b[3]+.5));}cx.stroke();cx.setLineDash([]);};
+    line(seg.filter(e=>!e[3]),'#777');line(seg.filter(e=>e[3]),'#7774');
+    line(oneway,'#a86',[s*.15,s*.12]);line(cross,'#5ffa',[s*.2,s*.1]);
+    /* 房間方塊 */
+    for(let i=0;i<RM.length;i++){
+      const r=RM[i],x=r[2],y=r[3];
+      if(x<vx0-1||x>vx1||y<vy0-1||y>vy1)continue;
+      const f=r[6];
+      cx.fillStyle=f&1?'#1a1a1a':'#2b2b2b';cx.fillRect(X(x+off),Y(y+off),sz,sz);
+      cx.strokeStyle=f&2?'#5c5':f&8?'#e55':'#aaa';cx.lineWidth=Math.max(1,s*.05);cx.strokeRect(X(x+off),Y(y+off),sz,sz);
+      /* 上下樓梯：小三角 */
+      if(s>7){const ud=r[7].filter(e=>e[0]>=4);if(ud.length){cx.fillStyle='#ff5';cx.font=(s*.3)+'px sans-serif';cx.fillText(ud.map(e=>e[0]===4?'▲':'▼').join(''),X(x+off+.04),Y(y+off+.3));}}
+      if(hits.has(r[0])){cx.strokeStyle='#f5f';cx.lineWidth=Math.max(2,s*.1);cx.strokeRect(X(x+off-.08),Y(y+off-.08),sz+s*.16,sz+s*.16);}
+    }
+    /* 門：出口中間的短橫線 */
+    if(s>6){cx.strokeStyle='#fa5';cx.lineWidth=Math.max(1.5,s*.08);cx.beginPath();
+      for(const [a,b,d,f] of door){const mx=(a[2]+b[2])/2+.5,my=(a[3]+b[3])/2+.5,h=d%2?[0,.15]:[.15,0];cx.moveTo(X(mx-h[0]),Y(my-h[1]));cx.lineTo(X(mx+h[0]),Y(my+h[1]));}
+      cx.stroke();}
+    /* 房間名稱 */
+    if(s>=34){cx.fillStyle='#ccc';cx.font=Math.min(13,s*.22)+'px sans-serif';cx.textAlign='center';
+      for(const r of RM){const x=r[2],y=r[3];if(x<vx0-1||x>vx1||y<vy0-1||y>vy1)continue;
+        const n=r[4],max=Math.max(3,Math.floor(s*.95/Math.min(13,s*.22)));cx.fillText(n.length>max?n.slice(0,max-1)+'…':n,X(x+.5),Y(y+off+sz/s+.22));}
+      cx.textAlign='left';}
+  }
+  /* 路線 */
+  if(route&&route.length>1){cx.strokeStyle='#fa5';cx.lineWidth=Math.max(2,s*.12);cx.beginPath();route.forEach((v,i)=>{const r=RM[IDX[v]];const px=X(r[2]+.5),py=Y(r[3]+.5);i?cx.lineTo(px,py):cx.moveTo(px,py);});cx.stroke();}
+  if(me!==null){const r=RM[IDX[me]];if(r){const px=X(r[2]+.5),py=Y(r[3]+.5),rr=Math.max(6,s*.45);cx.fillStyle='#39f';cx.strokeStyle='#fff';cx.lineWidth=2;cx.beginPath();cx.arc(px,py,rr,0,7);cx.fill();cx.stroke();
+    if(s<3.5){cx.font='bold 13px sans-serif';cx.fillStyle='#9cf';cx.fillText('你在這裡',px+rr+3,py+4);}}}
+  if(sel!==null){const r=RM[IDX[sel]];if(r){cx.strokeStyle='#ff5';cx.lineWidth=3;const sz=Math.max(6,s*.8);cx.strokeRect(X(r[2]+.5)-sz/2,Y(r[3]+.5)-sz/2,sz,sz);}}
+  /* 區域名稱（最後畫，蓋在上面） */
+  cx.textBaseline='top';
+  for(const a of A){
+    if(a.x>vx1||a.x+a.w<vx0||a.y>vy1||a.y+a.h<vy0)continue;
+    /* 總圖：字要塞得進區域塊才畫，避免名字疊成一團 */
+    const fs=showRooms?Math.min(18,Math.max(11,s*.6)):Math.min(16,(a.w+1.2)*s/Math.max(2,a.name.length),(a.h+1.2)*s*.8);
+    if(!showRooms&&fs<9)continue;
+    cx.font='bold '+fs+'px sans-serif';cx.fillStyle=showRooms?'#ff5':'#fff';
+    const y=showRooms?Y(a.y-.6)-fs-2:Y(a.y+a.h/2)-fs/2;
+    const x=showRooms?X(a.x-.6):X(a.x+a.w/2)-cx.measureText(a.name).width/2;
+    cx.fillText(a.name+(showRooms&&a.lv?'  Lv'+a.lv:''),x,y);
+  }
+  cx.textBaseline='alphabetic';
+}
+
+/* ---- 手勢：拖曳、兩指縮放、滾輪、點選 ---- */
+const pts=new Map();let moved=0,pinch=null;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);moved=0;cancelAnimationFrame(anim);
+  if(pts.size===2){const [a,b]=[...pts.values()];pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]),s,tx,ty,c:[(a[0]+b[0])/2,(a[1]+b[1])/2]};}});
+cv.addEventListener('pointermove',e=>{
+  if(!pts.has(e.pointerId))return;const p=pts.get(e.pointerId),dx=e.clientX-p[0],dy=e.clientY-p[1];
+  pts.set(e.pointerId,[e.clientX,e.clientY]);moved+=Math.abs(dx)+Math.abs(dy);
+  if(pts.size===1){tx+=dx;ty+=dy;draw();}
+  else if(pts.size===2&&pinch){const [a,b]=[...pts.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),c=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    const ns=Math.max(.05,Math.min(120,pinch.s*d/pinch.d));const wx=(pinch.c[0]-pinch.tx)/pinch.s,wy=(pinch.c[1]-pinch.ty)/pinch.s;
+    s=ns;tx=c[0]-wx*s;ty=c[1]-wy*s;draw();}
+});
+const up=e=>{const wasTap=pts.size===1&&moved<8;pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(wasTap)tap(e.clientX,e.clientY);};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',e=>{pts.delete(e.pointerId);pinch=null;});
+cv.addEventListener('wheel',e=>{e.preventDefault();const k=Math.exp(-e.deltaY*.0015),ns=Math.max(.05,Math.min(120,s*k));const wx=(e.clientX-tx)/s,wy=(e.clientY-ty)/s;s=ns;tx=e.clientX-wx*s;ty=e.clientY-wy*s;draw();},{passive:false});
+function tap(px,py){
+  const wx=(px-tx)/s,wy=(py-ty)/s;
+  if(s>=3.5){
+    const r=RM.find(r=>wx>=r[2]&&wx<r[2]+1&&wy>=r[3]&&wy<r[3]+1);
+    if(r){openRoom(r[0]);return;}
+  }
+  const a=A.find(a=>wx>=a.x-.6&&wx<=a.x+a.w+.6&&wy>=a.y-.6&&wy<=a.y+a.h+.6);
+  if(a){fit(a.x-1,a.y-2,a.x+a.w+1,a.y+a.h+1);closeCard();}
+  else closeCard();
+}
+
+/* ---- 資訊卡 ---- */
+const areaCache={};
+function loadArea(id){   /* 點開時才載入區域檔（房間描述、重生細節） */
+  if(areaCache[id])return areaCache[id];
+  return areaCache[id]=new Promise(ok=>{window.ROC={loadArea:a=>ok(a)};const sc=document.createElement('script');sc.src='../data/areas/'+id+'.js';sc.onerror=()=>ok(null);document.head.appendChild(sc);});
+}
+async function openRoom(v){
+  const r=RM[IDX[v]];if(!r)return;sel=v;draw();
+  const a=A[r[1]],card=$('card');
+  const fl=flagsOf(r).map(f=>FLAGN[f]||f).join('、');
+  let h='<button class="x" data-x>✕</button><h3>'+esc(r[4])+'</h3><div class="sub">#'+v+' · '+esc(a.name)+' · '+(SECTN[M.sect[r[5]]]||'')+(fl?' · '+fl:'')+'</div>';
+  h+='<div class="sec">出口</div><div class="row">'+(r[7].map(([d,t,f])=>{const q=RM[IDX[t]];if(!q)return '';const other=q[1]!==r[1];
+    return '<button data-go="'+t+'">'+DN[d]+'：'+esc(q[4])+(other?' <small>（'+esc(A[q[1]].name)+'）</small>':'')+(f&2?' 🔒':f&1?' 🚪':'')+(f&4?' ↗單向':'')+'</button>';}).join('')||'<span class="sub">沒有出口</span>')+'</div>';
+  const ms=roomMobs[v]||[],os=roomObjs[v]||[];
+  if(ms.length)h+='<div class="sec">怪物</div>'+ms.map(m=>{const x=M.mobs[m];return '<div class="li" data-mob="'+m+'"><span>'+esc(x[0])+'</span><small>Lv'+x[1]+' · 出現 '+x[2].length+' 處</small></div>';}).join('');
+  if(os.length)h+='<div class="sec">物品</div>'+os.map(o=>{const x=M.objs[o];return '<div class="li" data-obj="'+o+'"><span>'+esc(x[0])+'</span><small>'+(x[1]?'Lv'+x[1]+' · ':'')+esc(x[2]||'')+'</small></div>';}).join('');
+  h+='<div class="sec">路線</div><div class="row">'+(EMBED&&me!==null&&me!==v?'<button class="pri" data-walk="'+v+'">🚶 從我這裡走過去</button>':'')+'<button data-from="'+v+'"'+(from===v?' class="pri"':'')+'>'+(from===v?'★ 起點':'設為起點')+'</button>'
+    +(from!==null&&from!==v?'<button class="pri" data-to="'+v+'">從起點走到這裡</button>':'')+'<button data-copy="'+v+'">複製這裡的連結</button></div><div id="rt"></div>';
+  h+='<div class="sec">描述</div><div class="desc" id="desc">載入中…</div>';
+  card.innerHTML=h;card.classList.add('on');card.scrollTop=0;
+  history.replaceState(null,'','#r='+v);
+  const ad=await loadArea(a.id),rd=ad&&ad.rooms&&ad.rooms[v];
+  const el=$('desc');if(el&&sel===v)el.textContent=rd?String(rd.description||'（沒有描述）').replace(/\x1b\[[0-9;]*m/g,'').trim():'（讀不到描述）';
+}
+function closeCard(){$('card').classList.remove('on');sel=null;draw();}
+/* 最短路線（BFS，所有出口都算，含跨區） */
+function findRoute(a,b){
+  const prev={[a]:null},q=[a];
+  while(q.length){const v=q.shift();if(v===b)break;for(const [d,t] of RM[IDX[v]][7]){if(t in prev||IDX[t]===undefined)continue;prev[t]=[v,d];q.push(t);}}
+  if(!(b in prev))return null;
+  const path=[b],dirs=[];let v=b;while(prev[v]){dirs.unshift(prev[v][1]);v=prev[v][0];path.unshift(v);}
+  return {path,dirs};
+}
+const runs=dirs=>{const out=[];for(const d of dirs){const l=out[out.length-1];if(l&&l[0]===d)l[1]++;else out.push([d,1]);}return out.map(([d,n])=>(n>1?n:'')+DC[d]).join(' ');};
+$('card').addEventListener('click',e=>{
+  const b=e.target.closest('[data-go],[data-mob],[data-obj],[data-from],[data-to],[data-copy],[data-walk],[data-x]');if(!b)return;
+  if(b.dataset.x!==undefined)return closeCard();
+  if(b.dataset.go){const t=+b.dataset.go;openRoom(t);flyRoom(t);return;}
+  if(b.dataset.mob){const m=M.mobs[b.dataset.mob];hits=new Set(m[2]);showList('「'+m[0]+'」出現的地方',m[2],m[3]);draw();return;}
+  if(b.dataset.obj){const o=M.objs[b.dataset.obj];hits=new Set(o[3]);showList('「'+o[0]+'」出現的地方',o[3],o[4]);draw();return;}
+  if(b.dataset.from){from=+b.dataset.from;route=null;openRoom(from);toast('起點設好了，再點目的地房間');return;}
+  if(b.dataset.to){const R=findRoute(from,+b.dataset.to);
+    if(!R){$('rt').innerHTML='<div class="sub">走不到（可能要靠傳送或劇本）</div>';return;}
+    route=R.path;draw();const w=runs(R.dirs);
+    $('rt').innerHTML='<div class="route">'+R.dirs.length+' 步：'+esc(w)+'</div><div class="row"><button data-copyw="'+esc(w)+'">複製走法</button></div>';return;}
+  if(b.dataset.copy){copy(location.origin+location.pathname+'#r='+b.dataset.copy);return;}
+  if(b.dataset.walk){const R=findRoute(me,+b.dataset.walk);
+    if(!R){$('rt').innerHTML='<div class="sub">走不到（可能要靠傳送或劇本）</div>';return;}
+    route=R.path;draw();toGame({type:'walk',path:R.path,dirs:R.dirs});return;}
+});
+$('card').addEventListener('click',e=>{const b=e.target.closest('[data-copyw]');if(b)copy(b.dataset.copyw);});
+/* 起點→終點算好的路線，嵌入時也能直接在遊戲裡走（要先站在起點） */
+$('card').addEventListener('click',e=>{const b=e.target.closest('[data-to]');if(!b||!EMBED||!route)return;
+  const R=findRoute(from,+b.dataset.to);if(R&&me===from)$('rt').insertAdjacentHTML('beforeend','<div class="row"><button class="pri" data-walk="'+b.dataset.to+'">🚶 在遊戲裡照著走</button></div>');});
+function copy(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('已複製'),()=>prompt('複製這段：',t));}
+let tt;function toast(t){const el=$('tip');el.textContent=t;el.style.display='block';clearTimeout(tt);tt=setTimeout(()=>el.style.display='none',1800);}
+
+/* ---- 搜尋：房間、區域、怪物、物品 ---- */
+function showList(title,rooms,ai){
+  const el=$('res');
+  if(!rooms.length){   /* 沒有固定重生：通常是劇本、商店或怪物掉落 */
+    const a=A[ai];el.innerHTML='<div><b>'+esc(title)+'</b></div><div'+(a?' data-a="'+ai+'"':'')+'><small>沒有固定出現的房間（可能由劇本、商店或其他方式產生）</small>'+(a?'<br>屬於區域：'+esc(a.name)+' ▸':'')+'</div>';
+    el.classList.add('on');return;}
+  el.innerHTML='<div><b>'+esc(title)+'</b> <small>'+rooms.length+' 處</small></div>'+rooms.slice(0,80).map(v=>{const r=RM[IDX[v]];return r?'<div data-r="'+v+'">'+esc(r[4])+' <small>#'+v+' · '+esc(A[r[1]].name)+'</small></div>':'';}).join('');
+  el.classList.add('on');
+}
+$('q').addEventListener('input',()=>{
+  const q=$('q').value.trim().toLowerCase(),el=$('res');
+  if(!q){el.classList.remove('on');hits=new Set();draw();return;}
+  const out=[];const L=s=>String(s).toLowerCase();
+  for(let i=0;i<A.length&&out.length<15;i++)if(L(A[i].name).includes(q)||A[i].id.includes(q))out.push('<div data-a="'+i+'"><span class="k">區域</span>'+esc(A[i].name)+' <small>'+A[i].n+' 間 · Lv'+A[i].lv+'</small></div>');
+  for(const [v,m] of Object.entries(M.mobs)){if(out.length>40)break;if(L(m[0]).includes(q))out.push('<div data-m="'+v+'"><span class="k">怪物</span>'+esc(m[0])+' <small>Lv'+m[1]+' · '+(m[2].length?m[2].length+' 處':'無固定位置')+(A[m[3]]?' · '+esc(A[m[3]].name):'')+'</small></div>');}
+  for(const [v,o] of Object.entries(M.objs)){if(out.length>60)break;if(L(o[0]).includes(q))out.push('<div data-o="'+v+'"><span class="k">物品</span>'+esc(o[0])+' <small>'+(o[3].length?o[3].length+' 處':'無固定位置')+(A[o[4]]?' · '+esc(A[o[4]].name):'')+'</small></div>');}
+  const rs=RM.filter(r=>L(r[4]).includes(q)||String(r[0])===q);
+  for(const r of rs.slice(0,40))out.push('<div data-r="'+r[0]+'"><span class="k">房間</span>'+esc(r[4])+' <small>#'+r[0]+' · '+esc(A[r[1]].name)+'</small></div>');
+  hits=new Set(rs.map(r=>r[0]));draw();
+  el.innerHTML=out.join('')||'<div><small>找不到</small></div>';el.classList.add('on');
+});
+$('res').addEventListener('click',e=>{
+  const d=e.target.closest('div');if(!d)return;
+  if(d.dataset.a!==undefined){const a=A[+d.dataset.a];fit(a.x-1,a.y-2,a.x+a.w+1,a.y+a.h+1);$('res').classList.remove('on');return;}
+  if(d.dataset.m){const m=M.mobs[d.dataset.m];hits=new Set(m[2]);showList('「'+m[0]+'」出現的地方',m[2],m[3]);draw();return;}
+  if(d.dataset.o){const o=M.objs[d.dataset.o];hits=new Set(o[3]);showList('「'+o[0]+'」出現的地方',o[3],o[4]);draw();return;}
+  if(d.dataset.r){const v=+d.dataset.r;$('res').classList.remove('on');openRoom(v);flyRoom(v);}
+});
+$('bAll').onclick=()=>{const b=bounds();fit(...b);closeCard();$('res').classList.remove('on');};
+
+addEventListener('resize',resize);resize();
+if(EMBED){
+  $('bClose').style.display='';$('bMe').style.display='';$('top').querySelector('b').style.display='none';
+  $('bClose').onclick=()=>toGame({type:'close'});
+  $('bMe').onclick=()=>{if(me!==null){flyRoom(me,30);openRoom(me);}};
+  addEventListener('message',e=>{
+    if(e.origin!==location.origin||!e.data||e.data.roc!=='game')return;
+    if(e.data.type==='pos'){const first=me===null;me=e.data.room;draw();if(first||e.data.focus){closeCard();flyRoom(me,30);}}
+  });
+  toGame({type:'ready'});
+}
+/* 網址 #r=3001 直接飛到那個房間 */
+const m=location.hash.match(/r=(\d+)/);
+if(m&&IDX[m[1]]!==undefined){const b=bounds();fit(...b,false);setTimeout(()=>{openRoom(+m[1]);flyRoom(+m[1],30);},300);}
+else{const b=bounds();fit(...b,false);}
+})();
+</script>
+</body>
+</html>
