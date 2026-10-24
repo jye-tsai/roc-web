@@ -43,6 +43,9 @@ ROC（混沌幻世）中文 MUD 的瀏覽器單機版。純前端、沒有建置
 - **連線版**：`?remote` 時載入器只載 `ui/remote.js`（不載 data 和 engine），透過 `relay/worker.js`（Cloudflare Worker）連到實體站台。
   - `remote.js` 處理 telnet IAC、Big5／UTF-8 編碼、提示列解析。
   - 本機測試可以寫一個假的 WebSocket 站台，用 `?remote&relay=ws://127.0.0.1:埠號` 連過去。
+- **全區地圖**：`map.html`（獨立頁面，Canvas）＋`map/build.js` 產生的 `map/map.json`。
+  - `map.json` 格式：房間是 `[vnum, 區域索引, x, y, 名稱, 地形, 旗標位元, 出口[[方向,目標,旗標]]]`。
+  - 改了 `data/areas` 要重跑 `node map/build.js`，並更新 `map.html` 裡 `map.json?v=` 的版本號。
 - **UI**：`ui/panel.js`。
   - 快捷鍵：平常模式用 `normalKeys(ch)` 依情境產生按鈕；戰鬥模式在 `renderCombatKeys`；方向鍵狀態在 `renderDir`。
   - 指令總表在 `CMD_CAT`。
